@@ -312,21 +312,27 @@ export class ReportService {
       pdfExportUrl: `/api/projects/${projectId}/report/pdf`,
     };
 
-    // Upsert to ReportModel
-    await ReportModel.deleteMany({ analysisId: new mongoose.Types.ObjectId(results.analysisId) });
-    await ReportModel.create({
-      analysisId: new mongoose.Types.ObjectId(results.analysisId),
-      title: `${project.name || 'Startup'} Blueprint`,
-      executiveSummary: sections[0].content as string,
-      sections: sections.slice(0, 10).map((s) => ({
-        title: s.title,
-        agentId: s.agentId || 'system',
-        summary: s.summary,
-        keyFindings: Array.isArray(s.content) ? s.content : [JSON.stringify(s.content)],
-        recommendations: topRecommendations.slice(0, 3),
-      })),
-      generatedAt: new Date(),
-    });
+    // Upsert to ReportModel (safeguarded for serverless / zero-database mode)
+    try {
+      if (mongoose.connection.readyState === 1) {
+        await ReportModel.deleteMany({ analysisId: new mongoose.Types.ObjectId(results.analysisId) });
+        await ReportModel.create({
+          analysisId: new mongoose.Types.ObjectId(results.analysisId),
+          title: `${project.name || 'Startup'} Blueprint`,
+          executiveSummary: sections[0].content as string,
+          sections: sections.slice(0, 10).map((s) => ({
+            title: s.title,
+            agentId: s.agentId || 'system',
+            summary: s.summary,
+            keyFindings: Array.isArray(s.content) ? s.content : [JSON.stringify(s.content)],
+            recommendations: topRecommendations.slice(0, 3),
+          })),
+          generatedAt: new Date(),
+        });
+      }
+    } catch (dbErr) {
+      logger.warn({ err: dbErr }, 'ReportModel MongoDB upsert skipped');
+    }
 
     return blueprint;
   }
@@ -356,23 +362,40 @@ export class ReportService {
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>${blueprint.startupName} — Autonomous Startup Blueprint</title>
+  <title>${blueprint.startupName} — Autonomous Startup Blueprint (PDF)</title>
   <style>
     @media print {
-      body { margin: 0; padding: 20px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-      .no-print { display: none; }
+      body { margin: 0; padding: 16px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #fff; }
+      .no-print { display: none !important; }
+      @page { margin: 1.5cm; }
     }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #0f172a; padding: 32px; max-width: 850px; margin: auto; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #0f172a; padding: 32px; max-width: 860px; margin: auto; background: #fdfdfd; }
     .header { border-bottom: 3px solid #059669; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: flex-end; }
     .score-badge { background: #ecfdf5; border: 1px solid #a7f3d0; padding: 12px 20px; border-radius: 8px; text-align: center; }
     .score-num { font-size: 32px; font-weight: 800; color: #059669; line-height: 1; }
     .score-label { font-size: 11px; text-transform: uppercase; color: #065f46; font-weight: 600; margin-top: 4px; }
   </style>
+  <script>
+    window.addEventListener('load', function() {
+      // Prompt native browser print/save-as-PDF dialog automatically
+      setTimeout(function() {
+        try {
+          window.print();
+        } catch (e) {
+          console.error(e);
+        }
+      }, 400);
+    });
+  </script>
 </head>
 <body>
-  <div class="no-print" style="margin-bottom: 20px; text-align: right;">
-    <button onclick="window.print()" style="background: #059669; color: white; border: none; padding: 10px 18px; border-radius: 6px; font-weight: 600; cursor: pointer;">
-      🖨️ Print or Save as PDF
+  <div class="no-print" style="margin-bottom: 24px; padding: 14px 18px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
+    <div>
+      <span style="font-size: 13px; font-weight: 600; color: #1e293b;">📄 Printable Startup Blueprint</span>
+      <p style="margin: 2px 0 0 0; font-size: 12px; color: #64748b;">In your browser's Print window, select <strong>"Save as PDF"</strong> as Destination to download.</p>
+    </div>
+    <button onclick="window.print()" style="background: #059669; color: white; border: none; padding: 10px 18px; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 13px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+      🖨️ Download / Save as PDF
     </button>
   </div>
   <div class="header">
