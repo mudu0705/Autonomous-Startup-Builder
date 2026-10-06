@@ -4,11 +4,29 @@ import { apiRoutes } from './api/routes/index.ts';
 import { errorHandler } from './middleware/error.middleware.ts';
 import { requestLoggingHook, responseLoggingHook } from './middleware/logging.middleware.ts';
 import { logger } from './config/logger.ts';
+import { databaseService } from './services/database.ts';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
     logger: false, // We use structured custom logger via hooks for sanitization
     disableRequestLogging: true,
+  });
+
+  // Allow empty request bodies when Content-Type: application/json is sent
+  app.removeContentTypeParser('application/json');
+  app.addContentTypeParser('application/json', { parseAs: 'string' }, (_req, body, done) => {
+    if (!body || (typeof body === 'string' && body.trim() === '')) {
+      done(null, {});
+      return;
+    }
+    try {
+      const parsed = JSON.parse(typeof body === 'string' ? body : String(body));
+      done(null, parsed);
+    } catch (err) {
+      const syntaxErr = err as Error & { statusCode?: number };
+      syntaxErr.statusCode = 400;
+      done(syntaxErr, undefined);
+    }
   });
 
   // 1. Configure CORS
@@ -25,6 +43,13 @@ export async function buildApp(): Promise<FastifyInstance> {
   // 2. Request & Response Lifecycle Logging Hooks
   app.addHook('onRequest', requestLoggingHook);
   app.addHook('onResponse', responseLoggingHook);
+
+  // 2b. Ensure database connection is active before handling API routes
+  app.addHook('preHandler', async (request) => {
+    if (request.url.startsWith('/api') && !request.url.startsWith('/api/health')) {
+      await databaseService.ensureConnected();
+    }
+  });
 
   // 3. Centralized Error Handling
   app.setErrorHandler(errorHandler);

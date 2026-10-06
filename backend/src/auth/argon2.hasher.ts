@@ -1,4 +1,4 @@
-import argon2 from 'argon2';
+import { hash as argon2Hash, verify as argon2Verify } from '@node-rs/argon2';
 import type { PasswordHasher } from './types.ts';
 import { logger } from '../config/logger.ts';
 
@@ -11,8 +11,8 @@ export class Argon2PasswordHasher implements PasswordHasher {
       throw new Error('Password cannot be empty');
     }
     try {
-      return await argon2.hash(password, {
-        type: argon2.argon2id,
+      return await argon2Hash(password, {
+        algorithm: 2, // Argon2id
         memoryCost: 2 ** 16, // 64 MB
         timeCost: 3,
         parallelism: 1,
@@ -34,7 +34,7 @@ export class Argon2PasswordHasher implements PasswordHasher {
       return false;
     }
     try {
-      return await argon2.verify(hash, password);
+      return await argon2Verify(hash, password);
     } catch (err: unknown) {
       logger.warn('Failed password verification attempt or malformed hash');
       return false;
