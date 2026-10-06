@@ -46,6 +46,18 @@ export function errorHandler(
     return sendError(reply, 400, 'VALIDATION_ERROR', error.message);
   }
 
+  // 3b. Empty / Invalid JSON Body Parsing Error Handling
+  if (
+    ('code' in error && (error.code === 'FST_ERR_CTP_EMPTY_JSON_BODY' || error.code === 'FST_ERR_CTP_INVALID_JSON_BODY')) ||
+    error.message.includes('Body cannot be empty when content-type is set to')
+  ) {
+    logger.warn('Empty or invalid JSON body received with application/json header', {
+      path: request.url,
+      method: request.method,
+    });
+    return sendError(reply, 400, 'BAD_REQUEST', 'Body cannot be empty when Content-Type is set to application/json');
+  }
+
   // 4. Database Offline / Network Disconnect Fallback
   if (
     error.name === 'MongooseError' ||

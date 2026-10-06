@@ -28,7 +28,7 @@ const ScenarioSchema = new Schema<IScenarioDocument>(
     },
     type: {
       type: String,
-      enum: ['conservative', 'moderate', 'aggressive'],
+      enum: ['conservative', 'moderate', 'aggressive', 'custom'],
       required: true,
     },
     title: {
@@ -42,7 +42,9 @@ const ScenarioSchema = new Schema<IScenarioDocument>(
         revenue: { type: Number, required: true },
         expenses: { type: Number, required: true },
         burnRate: { type: Number, required: true },
-        cashRunwayMonths: { type: Number, required: true },
+        cashRunwayMonths: { type: Number, required: false, default: 0 },
+        netIncome: { type: Number, required: false },
+        cashRemaining: { type: Number, required: false },
       },
     ],
     projectedBreakEvenMonth: {

@@ -6,64 +6,123 @@ import { logger } from '../config/logger.ts';
 
 export class GeminiProvider implements IAIProvider {
   public readonly providerName = 'google-gemini';
-  public readonly modelName = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
   private client: GoogleGenAI | null = null;
 
+  // Ordered candidate models: prioritizes flash-lite for high throughput and separate free-tier quota pool
+  private readonly candidateModels: string[] = [
+    'gemini-3.1-flash-lite',
+    process.env.GEMINI_MODEL,
+    'gemini-3.8-flash',
+  ].filter((m, idx, arr): m is string => Boolean(m) && m.trim().length > 0 && arr.indexOf(m) === idx);
+
+  // Set of models that have hit daily free-tier quota limits (e.g., 20/day) during this session
+  private readonly exhaustedModels = new Set<string>();
+
+  public get modelName(): string {
+    const active = this.candidateModels.find((m) => !this.exhaustedModels.has(m));
+    return active || this.candidateModels[0] || 'gemini-3.1-flash-lite';
+  }
+
   constructor() {
-    const apiKey = env.GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+    this.getClient();
+  }
+
+  private getClient(): GoogleGenAI | null {
+    if (this.client) {
+      return this.client;
+    }
+    const apiKey = (env.GEMINI_API_KEY || process.env.GEMINI_API_KEY || '').trim();
     if (apiKey && apiKey !== 'MY_GEMINI_API_KEY') {
       try {
-        this.client = new GoogleGenAI({ apiKey });
-        logger.info(`Gemini AI Provider initialized successfully with model: ${this.modelName}`);
+        this.client = new GoogleGenAI({
+          apiKey,
+          httpOptions: {
+            headers: {
+              'User-Agent': 'aistudio-build',
+            },
+          },
+        });
+        logger.info(`Gemini AI Provider initialized successfully with primary model: ${this.modelName}`);
+        return this.client;
       } catch (err) {
         logger.warn('Failed to initialize Gemini AI Provider', {
           error: err instanceof Error ? err.message : 'Unknown error',
         });
+        return null;
       }
     }
+    return null;
   }
 
   public isAvailable(): boolean {
     if (process.env.NODE_ENV === 'test') {
       return false;
     }
-    return this.client !== null;
+    return this.getClient() !== null;
   }
 
   /**
-   * Helper that retries transient capacity spikes (e.g. 503 or 429) up to 2 times with backoff.
+   * Executes an operation with automatic model failover and transient retry.
+   * If a model hits permanent daily quota exhaustion (429 / RESOURCE_EXHAUSTED),
+   * it fails over to the next candidate model immediately without waiting.
    */
-  private async executeWithRetry<R>(operation: () => Promise<R>, maxRetries = 2): Promise<R> {
-    let lastError: unknown;
-    for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
-      try {
-        return await operation();
-      } catch (err: unknown) {
-        lastError = err;
-        const errMsg = err instanceof Error ? err.message : String(err);
-        const isTransient = errMsg.includes('503') || errMsg.includes('429') || errMsg.includes('high demand') || errMsg.includes('quota');
+  private async executeWithModelFailover<R>(
+    operation: (client: GoogleGenAI, model: string) => Promise<R>
+  ): Promise<R> {
+    const client = this.getClient();
+    if (!client) {
+      throw new Error('Gemini AI Provider is not configured. GEMINI_API_KEY is required.');
+    }
 
-        if (attempt <= maxRetries && isTransient) {
-          logger.warn(`Gemini API transient rate/demand spike (attempt ${attempt}/${maxRetries}), retrying after backoff...`, {
-            model: this.modelName,
-          });
-          await new Promise((resolve) => setTimeout(resolve, attempt * 1200));
-        } else {
-          break;
+    let lastError: unknown;
+
+    // Filter available models that haven't been marked as exhausted
+    const modelsToTry = this.candidateModels.filter((m) => !this.exhaustedModels.has(m));
+    if (modelsToTry.length === 0) {
+      // If all candidate models have hit quota, clear and try fresh or throw
+      throw new Error('All Gemini candidate models have reached quota limits. Falling back to deterministic mode.');
+    }
+
+    for (const model of modelsToTry) {
+      const maxRetries = 1;
+      for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
+        try {
+          return await operation(client, model);
+        } catch (err: unknown) {
+          lastError = err;
+          const errMsg = err instanceof Error ? err.message : String(err);
+          const isDailyQuota =
+            errMsg.includes('RESOURCE_EXHAUSTED') ||
+            errMsg.includes('Quota exceeded') ||
+            errMsg.includes('free_tier_requests') ||
+            errMsg.includes('Please retry in');
+          const isTransientCapacity =
+            errMsg.includes('503') || errMsg.includes('high demand') || errMsg.includes('temporarily unavailable');
+
+          if (isDailyQuota) {
+            // Mark model as exhausted so we don't hammer it again
+            this.exhaustedModels.add(model);
+            logger.warn(`Gemini model ${model} daily quota exhausted. Failing over to next candidate model...`);
+            break; // Break retry loop on this model, try next candidate model immediately
+          }
+
+          if (attempt <= maxRetries && isTransientCapacity) {
+            logger.warn(`Gemini API transient capacity spike on ${model} (attempt ${attempt}/${maxRetries}), retrying...`);
+            await new Promise((resolve) => setTimeout(resolve, 800));
+          } else {
+            break;
+          }
         }
       }
     }
+
     throw lastError;
   }
 
   public async generateText(request: AICompletionRequest): Promise<AICompletionResponse<string>> {
-    if (!this.client) {
-      throw new Error('Gemini AI Provider is not configured. GEMINI_API_KEY is required.');
-    }
-
-    return await this.executeWithRetry(async () => {
-      const response = await this.client!.models.generateContent({
-        model: this.modelName,
+    return await this.executeWithModelFailover(async (client, model) => {
+      const response = await client.models.generateContent({
+        model,
         contents: request.prompt,
         config: {
           systemInstruction: request.systemPrompt,
@@ -79,13 +138,9 @@ export class GeminiProvider implements IAIProvider {
   }
 
   public async generateStructured<T>(request: AICompletionRequest): Promise<AICompletionResponse<T>> {
-    if (!this.client) {
-      throw new Error('Gemini AI Provider is not configured. GEMINI_API_KEY is required.');
-    }
-
-    return await this.executeWithRetry(async () => {
-      const response = await this.client!.models.generateContent({
-        model: this.modelName,
+    return await this.executeWithModelFailover(async (client, model) => {
+      const response = await client.models.generateContent({
+        model,
         contents: request.prompt,
         config: {
           systemInstruction: request.systemPrompt,

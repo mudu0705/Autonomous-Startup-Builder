@@ -24,9 +24,15 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   const token = tokenStorage.get();
 
   const headers: Record<string, string> = {
-    ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
     ...(options.headers as Record<string, string>),
   };
+
+  if (options.body !== undefined && options.body !== '') {
+    headers['Content-Type'] = headers['Content-Type'] || 'application/json';
+  } else {
+    delete headers['Content-Type'];
+    delete headers['content-type'];
+  }
 
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;

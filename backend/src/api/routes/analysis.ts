@@ -27,7 +27,7 @@ export const analysisRoutes: FastifyPluginAsync = async (fastify) => {
    * POST /api/projects/:id/analyze
    * Initiates or resumes the 9-agent analysis pipeline.
    */
-  fastify.post<{ Params: { id: string } }>('/analyze', async (request, reply) => {
+  fastify.post<{ Params: { id: string }; Body?: Record<string, unknown> }>('/analyze', async (request, reply) => {
     if (!request.user) {
       throw new Error('Authenticated user context missing');
     }

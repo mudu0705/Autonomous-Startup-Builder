@@ -39,9 +39,16 @@ interface ApiResponse<T> {
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = tokenStorage.get();
   const headers: Record<string, string> = {
-    ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
     ...(options.headers as Record<string, string>),
   };
+
+  // Only set Content-Type: application/json when there is an actual request body
+  if (options.body !== undefined && options.body !== '') {
+    headers['Content-Type'] = headers['Content-Type'] || 'application/json';
+  } else {
+    delete headers['Content-Type'];
+    delete headers['content-type'];
+  }
 
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -75,6 +82,7 @@ export const analysisApi = {
   startAnalysis: async (projectId: string): Promise<{ analysisId: string; status: string }> => {
     return await request<{ analysisId: string; status: string }>(`/api/projects/${projectId}/analyze`, {
       method: 'POST',
+      body: JSON.stringify({}),
     });
   },
 

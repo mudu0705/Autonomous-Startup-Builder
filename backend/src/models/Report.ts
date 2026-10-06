@@ -36,9 +36,9 @@ const ReportSchema = new Schema<IReportDocument>(
     sections: [
       {
         title: { type: String, required: true },
-        agentId: { type: String, required: true },
-        summary: { type: String, required: true },
-        keyFindings: [{ type: String }],
+        agentId: { type: String, required: false, default: 'system' },
+        summary: { type: String, required: false, default: '' },
+        keyFindings: [{ type: Schema.Types.Mixed }],
         recommendations: [{ type: String }],
       },
     ],

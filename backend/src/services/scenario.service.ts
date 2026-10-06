@@ -164,18 +164,23 @@ export class ScenarioService {
     recommendations.push('Re-verify unit economics with 15 customer discovery interviews before committing capital.');
 
     // 5. Persist Scenario Document
+    const calculatedMetrics = newScenarios.expected.twelveMonthRevenueINR > 0
+      ? FinanceCalculationEngine.calculateTwelveMonthMetrics(newBudget, Math.round(origSetup * (newBudget / origBudget)), newOpEx, newMonthlyRev, 0.15).map((m) => ({
+          ...m,
+          cashRunwayMonths: FinanceCalculationEngine.calculateRunway(m.cashRemaining, m.burnRate),
+        }))
+      : [];
+
     const scenarioDoc = await ScenarioModel.create({
       analysisId,
-      type: scenarioType === 'custom' ? 'moderate' : scenarioType,
+      type: scenarioType,
       title,
       assumptions: [
         `Starting Budget: ₹${newBudget.toLocaleString()} INR (Orig: ₹${origBudget.toLocaleString()})`,
         `Monthly OpEx: ₹${newOpEx.toLocaleString()} INR (Orig: ₹${origOpEx.toLocaleString()})`,
         changes.notes ? `User Note: ${changes.notes}` : 'Simulated assumption modification',
       ],
-      metrics: newScenarios.expected.twelveMonthRevenueINR > 0
-        ? FinanceCalculationEngine.calculateTwelveMonthMetrics(newBudget, Math.round(origSetup * (newBudget / origBudget)), newOpEx, newMonthlyRev, 0.15)
-        : [],
+      metrics: calculatedMetrics,
       projectedBreakEvenMonth: newScenarios.expected.breakEvenMonth || undefined,
     });
 

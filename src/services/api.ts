@@ -51,9 +51,15 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   const token = tokenStorage.get();
 
   const headers: Record<string, string> = {
-    ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
     ...(options.headers as Record<string, string>),
   };
+
+  if (options.body !== undefined && options.body !== '') {
+    headers['Content-Type'] = headers['Content-Type'] || 'application/json';
+  } else {
+    delete headers['Content-Type'];
+    delete headers['content-type'];
+  }
 
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -84,7 +90,6 @@ export const api = {
   get: async <T>(endpoint: string, options: RequestInit = {}): Promise<T> => {
     const token = tokenStorage.get();
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
       ...(options.headers as Record<string, string>),
     };
     if (token) {
@@ -108,7 +113,7 @@ export const api = {
     return request<T>(endpoint, {
       ...options,
       method: 'POST',
-      body: body ? JSON.stringify(body) : undefined,
+      body: JSON.stringify(body ?? {}),
     });
   },
 };

@@ -543,6 +543,93 @@ describe('Phase 3-9 – Analysis API Routes', () => {
       });
       assert.equal(res.statusCode, 404);
     });
+
+    test('regression: accepts POST with empty JSON object {} and application/json header', async () => {
+      // Create user project marked ready for analysis
+      const project = await ProjectModel.create({
+        userId: new mongoose.Types.ObjectId(userId),
+        name: 'Ready Project',
+        startupIdea: 'AI personalized study planner for students',
+        status: 'READY_FOR_ANALYSIS',
+        intakeProgress: 100,
+        location: { country: 'India', scope: 'national', locations: [] },
+        budget: { amount: 500000, currency: 'INR', source: 'USER', isCertain: true },
+        analysisDepth: 'standard',
+      });
+
+      const res = await app.inject({
+        method: 'POST',
+        url: `/api/projects/${project._id.toString()}/analyze`,
+        headers: {
+          authorization: `Bearer ${userToken}`,
+          'content-type': 'application/json',
+        },
+        payload: {},
+      });
+
+      assert.equal(res.statusCode, 202);
+      const body = JSON.parse(res.payload);
+      assert.equal(body.success, true);
+      assert.ok(body.data.analysisId);
+      assert.equal(body.data.status, 'in_progress');
+    });
+
+    test('regression: accepts POST without body and without Content-Type header', async () => {
+      const project = await ProjectModel.create({
+        userId: new mongoose.Types.ObjectId(userId),
+        name: 'Ready Project No Body',
+        startupIdea: 'AI personalized study planner for students',
+        status: 'READY_FOR_ANALYSIS',
+        intakeProgress: 100,
+        location: { country: 'India', scope: 'national', locations: [] },
+        budget: { amount: 500000, currency: 'INR', source: 'USER', isCertain: true },
+        analysisDepth: 'standard',
+      });
+
+      const res = await app.inject({
+        method: 'POST',
+        url: `/api/projects/${project._id.toString()}/analyze`,
+        headers: {
+          authorization: `Bearer ${userToken}`,
+        },
+      });
+
+      assert.equal(res.statusCode, 202);
+      const body = JSON.parse(res.payload);
+      assert.equal(body.success, true);
+      assert.ok(body.data.analysisId);
+    });
+
+    test('regression: handles empty string body with application/json safely without crashing', async () => {
+      const project = await ProjectModel.create({
+        userId: new mongoose.Types.ObjectId(userId),
+        name: 'Ready Project Empty String Body',
+        startupIdea: 'AI personalized study planner for students',
+        status: 'READY_FOR_ANALYSIS',
+        intakeProgress: 100,
+        location: { country: 'India', scope: 'national', locations: [] },
+        budget: { amount: 500000, currency: 'INR', source: 'USER', isCertain: true },
+        analysisDepth: 'standard',
+      });
+
+      const res = await app.inject({
+        method: 'POST',
+        url: `/api/projects/${project._id.toString()}/analyze`,
+        headers: {
+          authorization: `Bearer ${userToken}`,
+          'content-type': 'application/json',
+        },
+        payload: '',
+      });
+
+      // Should succeed with 202 or return handled 400, never uncaught FST_ERR_CTP_EMPTY_JSON_BODY 500
+      assert.ok(res.statusCode === 202 || res.statusCode === 400);
+      const body = JSON.parse(res.payload);
+      if (res.statusCode === 202) {
+        assert.equal(body.success, true);
+        assert.ok(body.data.analysisId);
+      }
+    });
   });
 
   // ---- GET /api/projects/:id/status ----

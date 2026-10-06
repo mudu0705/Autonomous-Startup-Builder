@@ -26,9 +26,15 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   const token = tokenStorage.get();
 
   const headers: Record<string, string> = {
-    ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
     ...(options.headers as Record<string, string>),
   };
+
+  if (options.body !== undefined && options.body !== '') {
+    headers['Content-Type'] = headers['Content-Type'] || 'application/json';
+  } else {
+    delete headers['Content-Type'];
+    delete headers['content-type'];
+  }
 
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -81,6 +87,7 @@ export const intakeApi = {
   resetConversation: async (projectId: string): Promise<IntakeConversationData> => {
     return await request<IntakeConversationData>(`/api/projects/${projectId}/conversation/reset`, {
       method: 'POST',
+      body: JSON.stringify({}),
     });
   },
 
@@ -90,6 +97,7 @@ export const intakeApi = {
   confirmIntake: async (projectId: string): Promise<{ success: boolean; status: string }> => {
     return await request<{ success: boolean; status: string }>(`/api/projects/${projectId}/conversation/confirm`, {
       method: 'POST',
+      body: JSON.stringify({}),
     });
   },
 };

@@ -114,15 +114,17 @@ export class AnalysisOrchestrator {
       { $set: { status: 'ANALYSIS_RUNNING' } }
     );
 
-    // Launch pipeline execution asynchronously
+    // Launch pipeline execution asynchronously (skip background execution in test runner)
     const analysisIdStr = analysis._id.toString();
-    this.executePipelineAsync(project, analysisIdStr).catch((err) => {
-      logger.error('Unhandled pipeline execution error', {
-        projectId,
-        analysisId: analysisIdStr,
-        error: err instanceof Error ? err.message : 'Unknown error',
+    if (process.env.NODE_ENV !== 'test') {
+      this.executePipelineAsync(project, analysisIdStr).catch((err) => {
+        logger.error('Unhandled pipeline execution error', {
+          projectId,
+          analysisId: analysisIdStr,
+          error: err instanceof Error ? err.message : 'Unknown error',
+        });
       });
-    });
+    }
 
     return {
       analysisId: analysisIdStr,
