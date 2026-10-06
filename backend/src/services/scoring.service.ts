@@ -207,6 +207,8 @@ export class ScoringService {
   /**
    * Persists calculated score into MongoDB ScoreModel.
    */
+  private readonly memoryScores = new Map<string, any>();
+
   public async persistScore(
     analysisId: string,
     calculated: ReturnType<ScoringService['calculateScore']>
@@ -231,6 +233,24 @@ export class ScoringService {
         },
       ],
     }));
+
+    if (mongoose.connection.readyState !== 1) {
+      const memoryDoc = {
+        _id: new mongoose.Types.ObjectId().toHexString(),
+        analysisId,
+        overallScore: calculated.overallScore,
+        verdict: verdictMapping[calculated.verdict] || 'viable_with_adjustments',
+        categories,
+        calculatedAt: new Date(),
+      };
+      this.memoryScores.set(analysisId, memoryDoc);
+      logger.info('Startup Potential Score persisted in memory fallback', {
+        analysisId,
+        overallScore: calculated.overallScore,
+        scoreBand: calculated.scoreBand,
+      });
+      return memoryDoc as any;
+    }
 
     await ScoreModel.deleteMany({ analysisId: new mongoose.Types.ObjectId(analysisId) });
 

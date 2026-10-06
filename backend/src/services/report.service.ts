@@ -3,6 +3,7 @@ import { ProjectModel } from '../models/Project.ts';
 import { AnalysisModel } from '../models/Analysis.ts';
 import { ReportModel, IReportDocument } from '../models/Report.ts';
 import { orchestrator } from './orchestrator.service.ts';
+import { projectService } from './project.service.ts';
 import type {
   StartupBlueprint,
   ReportSection,
@@ -17,7 +18,7 @@ export class ReportService {
    */
   public async generateBlueprint(projectId: string, userId: string): Promise<StartupBlueprint> {
     const results = await orchestrator.getAnalysisResults(projectId, userId);
-    const project = await ProjectModel.findById(projectId);
+    const project = await projectService.getUserProjectById(userId, projectId);
 
     if (!project) {
       throw new NotFoundError('Project not found');
