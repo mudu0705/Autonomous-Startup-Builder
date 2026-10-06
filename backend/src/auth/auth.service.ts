@@ -1,6 +1,7 @@
+import mongoose from 'mongoose';
 import type { IAuthService } from './auth.interface.ts';
 import type { AuthSession, PasswordHasher, TokenManager } from './types.ts';
-import type { User } from '../../../shared/types/user.ts';
+import type { User, UserStatus } from '../../../shared/types/user.ts';
 import type { UserLoginInput, UserRegistrationInput } from '../../../shared/schemas/index.ts';
 import { UserRegistrationSchema, UserLoginSchema } from '../../../shared/schemas/index.ts';
 import { UserModel, IUserDocument } from '../models/User.ts';
@@ -25,7 +26,20 @@ export function toSafeUser(doc: IUserDocument): User {
   };
 }
 
+interface MemoryUserRecord {
+  id: string;
+  email: string;
+  passwordHash: string;
+  fullName?: string;
+  role: 'user' | 'admin';
+  status?: UserStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export class AuthService implements IAuthService {
+  private readonly memoryUsers = new Map<string, MemoryUserRecord>();
+
   constructor(
     private readonly hasher: PasswordHasher = argon2Hasher,
     private readonly tokenManager: TokenManager = jwtTokenManager
@@ -34,6 +48,7 @@ export class AuthService implements IAuthService {
   /**
    * Registers a new user with email normalization, Argon2 password hashing,
    * default 'user' role, and 'active' status. Returns a safe user object and JWT session token.
+   * If MongoDB is not connected, falls back gracefully to in-memory persistence.
    */
   async register(input: UserRegistrationInput): Promise<AuthSession> {
     const parseResult = UserRegistrationSchema.safeParse(input);
@@ -42,6 +57,45 @@ export class AuthService implements IAuthService {
     }
 
     const normalizedEmail = parseResult.data.email.toLowerCase().trim();
+
+    // In-memory fallback if MongoDB connection is not active
+    if (mongoose.connection.readyState !== 1) {
+      const existing = Array.from(this.memoryUsers.values()).find((u) => u.email === normalizedEmail);
+      if (existing) {
+        throw new ConflictError('A user with this email address already exists');
+      }
+
+      const passwordHash = await this.hasher.hash(parseResult.data.password);
+      const userId = new mongoose.Types.ObjectId().toHexString();
+      const safeUser: User = {
+        id: userId,
+        email: normalizedEmail,
+        fullName: parseResult.data.fullName?.trim(),
+        role: 'user',
+        status: 'active',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      this.memoryUsers.set(userId, {
+        ...safeUser,
+        passwordHash,
+      });
+
+      const token = this.tokenManager.sign({
+        userId: safeUser.id,
+        email: safeUser.email,
+        role: safeUser.role,
+      });
+
+      logger.info('User registered via in-memory fallback', { userId: safeUser.id, email: safeUser.email });
+
+      return {
+        token,
+        user: safeUser,
+        expiresIn: 7 * 24 * 60 * 60,
+      };
+    }
 
     // Check for existing user with identical email
     const existingUser = await UserModel.findOne({ email: normalizedEmail });
@@ -73,7 +127,7 @@ export class AuthService implements IAuthService {
     return {
       token,
       user: safeUser,
-      expiresIn: 7 * 24 * 60 * 60, // 7 days in seconds
+      expiresIn: 7 * 24 * 60 * 60,
     };
   }
 
@@ -88,6 +142,47 @@ export class AuthService implements IAuthService {
     }
 
     const normalizedEmail = parseResult.data.email.toLowerCase().trim();
+
+    // In-memory fallback if MongoDB connection is not active
+    if (mongoose.connection.readyState !== 1) {
+      const memoryUser = Array.from(this.memoryUsers.values()).find((u) => u.email === normalizedEmail);
+      if (!memoryUser) {
+        throw new UnauthorizedError('Invalid email or password');
+      }
+
+      if (memoryUser.status !== 'active') {
+        throw new UnauthorizedError('Account is disabled or inactive');
+      }
+
+      const isPasswordValid = await this.hasher.verify(parseResult.data.password, memoryUser.passwordHash);
+      if (!isPasswordValid) {
+        throw new UnauthorizedError('Invalid email or password');
+      }
+
+      const safeUser: User = {
+        id: memoryUser.id,
+        email: memoryUser.email,
+        fullName: memoryUser.fullName,
+        role: memoryUser.role,
+        status: memoryUser.status,
+        createdAt: memoryUser.createdAt,
+        updatedAt: memoryUser.updatedAt,
+      };
+
+      const token = this.tokenManager.sign({
+        userId: safeUser.id,
+        email: safeUser.email,
+        role: safeUser.role,
+      });
+
+      logger.info('User logged in via in-memory fallback', { userId: safeUser.id, email: safeUser.email });
+
+      return {
+        token,
+        user: safeUser,
+        expiresIn: 7 * 24 * 60 * 60,
+      };
+    }
 
     // Query user and explicitly select passwordHash (which is select: false by default)
     const userDoc = await UserModel.findOne({ email: normalizedEmail }).select('+passwordHash');
@@ -129,6 +224,27 @@ export class AuthService implements IAuthService {
   async verifySession(token: string): Promise<AuthSession | null> {
     try {
       const payload = this.tokenManager.verify(token);
+
+      if (mongoose.connection.readyState !== 1) {
+        const memoryUser = this.memoryUsers.get(payload.userId);
+        if (!memoryUser || memoryUser.status !== 'active') {
+          return null;
+        }
+        return {
+          token,
+          user: {
+            id: memoryUser.id,
+            email: memoryUser.email,
+            fullName: memoryUser.fullName,
+            role: memoryUser.role,
+            status: memoryUser.status,
+            createdAt: memoryUser.createdAt,
+            updatedAt: memoryUser.updatedAt,
+          },
+          expiresIn: 7 * 24 * 60 * 60,
+        };
+      }
+
       const userDoc = await UserModel.findById(payload.userId);
       if (!userDoc || userDoc.status !== 'active') {
         return null;
@@ -147,6 +263,22 @@ export class AuthService implements IAuthService {
    * Resolves an authenticated user by ID, ensuring they exist and are active.
    */
   async getCurrentUser(userId: string): Promise<User> {
+    if (mongoose.connection.readyState !== 1) {
+      const memoryUser = this.memoryUsers.get(userId);
+      if (!memoryUser) {
+        throw new NotFoundError('User not found');
+      }
+      return {
+        id: memoryUser.id,
+        email: memoryUser.email,
+        fullName: memoryUser.fullName,
+        role: memoryUser.role,
+        status: memoryUser.status,
+        createdAt: memoryUser.createdAt,
+        updatedAt: memoryUser.updatedAt,
+      };
+    }
+
     const userDoc = await UserModel.findById(userId);
     if (!userDoc) {
       throw new NotFoundError('User not found');

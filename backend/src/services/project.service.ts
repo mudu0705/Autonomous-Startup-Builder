@@ -32,6 +32,8 @@ export function toSafeProject(doc: IProjectDocument): Project {
 }
 
 export class ProjectService {
+  private readonly memoryProjects = new Map<string, Project>();
+
   /**
    * Creates a new startup project document owned strictly by the authenticated user.
    */
@@ -42,6 +44,32 @@ export class ProjectService {
     }
 
     const validatedData = parseResult.data;
+
+    // In-memory fallback if MongoDB connection is not active
+    if (mongoose.connection.readyState !== 1) {
+      const projectId = new mongoose.Types.ObjectId().toHexString();
+      const project: Project = {
+        id: projectId,
+        userId,
+        name: validatedData.name.trim(),
+        startupIdea: validatedData.startupIdea.trim(),
+        proposedSolution: validatedData.proposedSolution?.trim(),
+        targetCustomers: validatedData.targetCustomers?.trim(),
+        location: validatedData.location || { country: 'India', scope: 'national', locations: [] },
+        budget: validatedData.budget || { amount: null, currency: 'INR', source: 'USER', isCertain: true },
+        revenueModel: validatedData.revenueModel?.trim(),
+        additionalInformation: validatedData.additionalInformation?.trim(),
+        analysisDepth: validatedData.analysisDepth || 'standard',
+        status: 'DRAFT',
+        intakeProgress: 0,
+        score: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      this.memoryProjects.set(projectId, project);
+      logger.info('Project created in memory fallback', { projectId, userId });
+      return project;
+    }
 
     const doc = await ProjectModel.create({
       userId: new mongoose.Types.ObjectId(userId),
@@ -67,6 +95,14 @@ export class ProjectService {
    * Retrieves projects owned by user (or all projects if admin requests showAll).
    */
   async getUserProjects(userId: string, role?: UserRole, showAll?: boolean): Promise<Project[]> {
+    if (mongoose.connection.readyState !== 1) {
+      const all = Array.from(this.memoryProjects.values());
+      if (role === 'admin' && showAll) {
+        return all;
+      }
+      return all.filter((p) => p.userId === userId);
+    }
+
     const filter = (role === 'admin' && showAll)
       ? {}
       : { userId: new mongoose.Types.ObjectId(userId) };
@@ -80,6 +116,14 @@ export class ProjectService {
    * Retrieves a single project strictly enforcing ownership matching userId (or admin capability).
    */
   async getUserProjectById(userId: string, projectId: string, role?: UserRole): Promise<Project> {
+    if (mongoose.connection.readyState !== 1) {
+      const proj = this.memoryProjects.get(projectId);
+      if (!proj || (role !== 'admin' && proj.userId !== userId)) {
+        throw new NotFoundError('Project not found');
+      }
+      return proj;
+    }
+
     if (!mongoose.Types.ObjectId.isValid(projectId)) {
       throw new NotFoundError('Project not found');
     }
@@ -110,16 +154,31 @@ export class ProjectService {
     input: ProjectUpdateInput,
     role?: UserRole
   ): Promise<Project> {
-    if (!mongoose.Types.ObjectId.isValid(projectId)) {
-      throw new NotFoundError('Project not found');
-    }
-
     const parseResult = ProjectUpdateSchema.safeParse(input);
     if (!parseResult.success) {
       throw new ValidationError('Invalid update parameters', parseResult.error.format());
     }
 
     const updateData = parseResult.data;
+
+    if (mongoose.connection.readyState !== 1) {
+      const proj = this.memoryProjects.get(projectId);
+      if (!proj || (role !== 'admin' && proj.userId !== userId)) {
+        throw new NotFoundError('Project not found');
+      }
+      const updated: Project = {
+        ...proj,
+        ...updateData,
+        updatedAt: new Date().toISOString(),
+      };
+      this.memoryProjects.set(projectId, updated);
+      logger.info('Project updated in memory fallback', { projectId, userId });
+      return updated;
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(projectId)) {
+      throw new NotFoundError('Project not found');
+    }
 
     const filter: Record<string, unknown> = {
       _id: new mongoose.Types.ObjectId(projectId),
@@ -147,6 +206,16 @@ export class ProjectService {
    * Deletes a project owned strictly by user (or admin).
    */
   async deleteUserProject(userId: string, projectId: string, role?: UserRole): Promise<boolean> {
+    if (mongoose.connection.readyState !== 1) {
+      const proj = this.memoryProjects.get(projectId);
+      if (!proj || (role !== 'admin' && proj.userId !== userId)) {
+        throw new NotFoundError('Project not found');
+      }
+      this.memoryProjects.delete(projectId);
+      logger.info('Project deleted in memory fallback', { projectId, userId });
+      return true;
+    }
+
     if (!mongoose.Types.ObjectId.isValid(projectId)) {
       throw new NotFoundError('Project not found');
     }

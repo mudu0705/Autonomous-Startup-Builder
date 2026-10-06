@@ -19,6 +19,7 @@ const envSchema = z.object({
   OLLAMA_TIMEOUT_MS: z.string().default('120000').transform((val) => parseInt(val, 10)),
   AI_PROVIDER: z.enum(['ollama', 'gemini', 'auto']).default('auto'),
   GITHUB_TOKEN: z.string().optional().default(''),
+  TAVILY_API_KEY: z.string().optional().default(''),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);
