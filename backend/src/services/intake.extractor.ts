@@ -5,7 +5,7 @@ import type {
   IntakeBudget,
   FieldSource,
 } from '../../../shared/types/intake.ts';
-import { geminiProvider } from '../ai/gemini.provider.ts';
+import { aiProviderManager } from '../ai/provider.manager.ts';
 import { logger } from '../config/logger.ts';
 
 export interface ExtractionResult {
@@ -417,8 +417,8 @@ export async function extractIntakeInformation(
   // Always compute rule-based baseline
   const baseline = ruleBasedExtraction(message, currentCategory, currentState);
 
-  // If Gemini provider is available, enrich with LLM extraction
-  if (geminiProvider.isAvailable()) {
+  // If AI provider is available, enrich with LLM extraction
+  if (aiProviderManager.isAvailable()) {
     try {
       const prompt = `You are the background intelligence engine for Autonomous Startup Builder's Smart Guided Intake.
 Extract any startup information present in the user's natural message into the 9 categories.
@@ -451,7 +451,7 @@ INSTRUCTIONS:
 
 DO NOT invent fields not mentioned. Return JSON.`;
 
-      const response = await geminiProvider.generateStructured<{
+      const response = await aiProviderManager.generateStructured<{
         extracted?: Partial<IntakeStructuredState>;
         fieldSources?: Record<string, FieldSource>;
         assistantMessage?: string;

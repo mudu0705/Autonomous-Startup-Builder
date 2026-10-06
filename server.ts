@@ -29,14 +29,15 @@ async function startServer() {
     vite = await createViteServer({
       server: {
         middlewareMode: true,
-        ws: isHmrDisabled ? false : undefined,
-        hmr: isHmrDisabled ? false : { server: app.server },
+        ws: (isHmrDisabled ? false : { server: app.server }) as any,
+        hmr: (isHmrDisabled ? false : { server: app.server }) as any,
         watch: isHmrDisabled ? null : {},
       },
       appType: 'custom',
     });
 
     logger.info('Vite server initialized', {
+      wsServerSpecified: !!((vite.config.server.ws as any) && typeof vite.config.server.ws === 'object' && (vite.config.server.ws as any).server),
       wsConfig: typeof vite.config.server.ws,
       hmrConfig: typeof vite.config.server.hmr,
     });

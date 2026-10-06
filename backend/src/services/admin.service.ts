@@ -4,7 +4,7 @@ import { ProjectModel } from '../models/Project.ts';
 import { AnalysisModel } from '../models/Analysis.ts';
 import { AgentRunModel } from '../models/AgentRun.ts';
 import { LogModel } from '../models/Log.ts';
-import { geminiProvider } from '../ai/gemini.provider.ts';
+import { aiProviderManager } from '../ai/provider.manager.ts';
 import { researchService } from '../research/research.service.ts';
 import { logger } from '../config/logger.ts';
 
@@ -131,8 +131,20 @@ export class AdminService {
   public async getSystemHealth(): Promise<{
     status: 'healthy' | 'degraded' | 'unhealthy';
     database: { status: string; latencyMs: number };
-    aiProvider: { provider: string; model: string; available: boolean };
-    researchProvider: { provider: string; available: boolean; mode: string };
+    aiProvider: {
+      provider: string;
+      model: string;
+      available: boolean;
+      mode?: string;
+      ollama?: any;
+      gemini?: any;
+    };
+    researchProvider: {
+      provider: string;
+      available: boolean;
+      mode: string;
+      githubAvailable?: boolean;
+    };
     apiServer: { uptimeSeconds: number; memoryUsageMB: number; nodeVersion: string };
   }> {
     // 1. Check MongoDB ping
@@ -146,8 +158,9 @@ export class AdminService {
       dbStatus = 'disconnected';
     }
 
-    const aiAvailable = geminiProvider.isAvailable();
+    const aiStatus = await aiProviderManager.getProviderStatus();
     const researchAvailable = researchService.isAvailable();
+    const gitHubAvailable = researchService.isGitHubAvailable();
 
     const mem = process.memoryUsage();
     const memoryMB = Math.round(mem.heapUsed / 1024 / 1024);
@@ -156,14 +169,18 @@ export class AdminService {
       status: dbStatus === 'connected' ? 'healthy' : 'degraded',
       database: { status: dbStatus, latencyMs: dbLatency },
       aiProvider: {
-        provider: geminiProvider.providerName,
-        model: geminiProvider.modelName,
-        available: aiAvailable,
+        provider: aiProviderManager.providerName,
+        model: aiProviderManager.modelName,
+        available: aiProviderManager.isAvailable(),
+        mode: aiProviderManager.getMode(),
+        ollama: aiStatus.ollama,
+        gemini: aiStatus.gemini,
       },
       researchProvider: {
         provider: 'google-search',
         available: researchAvailable,
         mode: researchAvailable ? 'live-search' : 'analytical-fallback',
+        githubAvailable: gitHubAvailable,
       },
       apiServer: {
         uptimeSeconds: Math.round(process.uptime()),

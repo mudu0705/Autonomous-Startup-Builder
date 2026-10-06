@@ -1,6 +1,5 @@
 import type { FinanceBudgetOutput } from '../../../shared/types/agent.ts';
-import { FinanceBudgetOutputSchema } from '../../../shared/schemas/agentOutputs.schema.ts';
-import { geminiProvider } from '../ai/gemini.provider.ts';
+import { aiProviderManager } from '../ai/provider.manager.ts';
 import { FinanceCalculationEngine } from '../services/finance.engine.ts';
 import { logger } from '../config/logger.ts';
 
@@ -25,27 +24,31 @@ export async function runFinanceBudgetAgent(
   const userBudgetAmount = project.budget?.amount || null;
   const isAiEstimated = !userBudgetAmount || project.budget?.source === 'AI_ESTIMATED';
 
-  if (!geminiProvider.isAvailable()) {
-    throw new Error('Gemini AI Provider is not available. GEMINI_API_KEY is required for Finance & Budget Agent analysis.');
-  }
-
   // Determine starting budget baseline in INR
   const baselineBudgetINR = userBudgetAmount && userBudgetAmount > 0
     ? userBudgetAmount
-    : 500000; // Default estimate: ₹5 Lakhs if AI Estimated
+    : 500000; // Sensible default estimate: ₹5 Lakhs if user chose AI Estimated
 
   // Baseline cost distributions for early Indian software startups
-  let initialSetupCost = Math.round(baselineBudgetINR * 0.25); // Setup, legal, branding, tooling (~25%)
+  let initialSetupCost = Math.round(baselineBudgetINR * 0.25); // Setup, legal, branding, tooling (approx 25%)
   let monthlyOpEx = Math.round((baselineBudgetINR - initialSetupCost) / 7); // Aim for 6-8 month default runway
   if (monthlyOpEx < 25000) monthlyOpEx = 25000; // Floor at ₹25k/mo
   let baseExpectedMonthlyRev = Math.round(monthlyOpEx * 0.7); // Month 1 target
 
+  // If AI Provider is available, refine qualitative cost categories and breakdown
+  let qualitativeFindings: string[] = [];
   let qualitativeRisks: string[] = [];
   let qualitativeRecs: string[] = [];
 
-  const prompt = `You are the Finance & Budget Agent for a startup evaluation platform.
+  let aiUsed = false;
+  let providerName = 'deterministic';
+  let modelName = 'none';
+
+  if (aiProviderManager.isAvailable()) {
+    try {
+      const prompt = `You are the Finance & Budget Agent for a startup evaluation platform.
 Evaluate this startup's capital requirements in INR.
-Note: You provide domain assumptions and cost item categories; the deterministic calculation engine computes all financial arithmetic.
+Note: You provide domain assumptions; the deterministic calculation engine computes all arithmetic.
 
 STARTUP: ${startupName}
 IDEA: ${idea}
@@ -55,13 +58,10 @@ PROPOSED SOLUTION: ${project.proposedSolution || 'Digital application'}
 INSTRUCTIONS:
 1. Provide realistic breakdown categories for setup costs and monthly operating expenses in India.
 2. Outline key financial risks (cash burn, payment gateway fees, server scaling).
-3. Recommend capital allocation optimization strategies.
-4. Distinguish between USER PROVIDED budget, AI ESTIMATED baseline, and ASSUMED cost distributions.
+3. Recommend 2 capital allocation optimization strategies.
 
 Respond with valid JSON:
 {
-  "agentId": "finance_budget",
-  "name": "Finance & Budget Agent",
   "score": <number 0-100 indicating financial feasibility and runway health>,
   "confidence": <number 0.75-0.9>,
   "executiveSummary": "<2 sentences summarizing capital efficiency, runway length, and break-even feasibility>",
@@ -82,42 +82,47 @@ Respond with valid JSON:
   "recommendations": [
     "Preserve at least 6 months of operating runway before taking on full-time overhead",
     "Leverage founder-led sales to keep initial CAC near zero for first 50 customers"
-  ],
-  "sources": [],
-  "limitations": ["Financial arithmetic computed deterministically by server engine."]
+  ]
 }
 
 Return JSON only.`;
 
-  const response = await geminiProvider.generateStructured<{
-    score?: number;
-    confidence?: number;
-    executiveSummary?: string;
-    initialCostItems?: Array<{ item: string; amountINR: number; category: string }>;
-    monthlyOpExItems?: Array<{ item: string; amountINR: number; category: string }>;
-    financialRisks?: string[];
-    recommendations?: string[];
-    sources?: any[];
-    limitations?: string[];
-  }>({
-    prompt,
-    systemPrompt: 'You are an Indian venture finance specialist. Provide realistic early-stage startup cost modeling. Return JSON only.',
-    temperature: 0.1,
-  });
+      const response = await aiProviderManager.generateStructured<{
+        score?: number;
+        confidence?: number;
+        executiveSummary?: string;
+        initialCostItems?: Array<{ item: string; amountINR: number; category: string }>;
+        monthlyOpExItems?: Array<{ item: string; amountINR: number; category: string }>;
+        financialRisks?: string[];
+        recommendations?: string[];
+      }>({
+        prompt,
+        systemPrompt: 'You are an Indian venture finance specialist. Provide realistic early-stage startup cost modeling. Return JSON only.',
+        temperature: 0.1,
+      });
 
-  if (!response.parsed) {
-    throw new Error('FinanceBudgetAgent received empty response from Gemini');
-  }
+      if (response.parsed) {
+        aiUsed = true;
+        const active = aiProviderManager.getActiveProvider();
+        providerName = active?.providerName || aiProviderManager.providerName;
+        modelName = active?.modelName || aiProviderManager.modelName;
 
-  if (response.parsed.financialRisks) qualitativeRisks = response.parsed.financialRisks;
-  if (response.parsed.recommendations) qualitativeRecs = response.parsed.recommendations;
-  if (response.parsed.initialCostItems && response.parsed.initialCostItems.length > 0) {
-    const sum = response.parsed.initialCostItems.reduce((acc, i) => acc + (i.amountINR || 0), 0);
-    if (sum > 0 && sum < baselineBudgetINR) initialSetupCost = sum;
-  }
-  if (response.parsed.monthlyOpExItems && response.parsed.monthlyOpExItems.length > 0) {
-    const sum = response.parsed.monthlyOpExItems.reduce((acc, i) => acc + (i.amountINR || 0), 0);
-    if (sum > 0) monthlyOpEx = sum;
+        if (response.parsed.financialRisks) qualitativeRisks = response.parsed.financialRisks;
+        if (response.parsed.recommendations) qualitativeRecs = response.parsed.recommendations;
+        if (response.parsed.initialCostItems && response.parsed.initialCostItems.length > 0) {
+          const sum = response.parsed.initialCostItems.reduce((acc, i) => acc + (i.amountINR || 0), 0);
+          if (sum > 0 && sum < baselineBudgetINR) initialSetupCost = sum;
+        }
+        if (response.parsed.monthlyOpExItems && response.parsed.monthlyOpExItems.length > 0) {
+          const sum = response.parsed.monthlyOpExItems.reduce((acc, i) => acc + (i.amountINR || 0), 0);
+          if (sum > 0) monthlyOpEx = sum;
+        }
+      }
+    } catch (err) {
+      logger.warn('FinanceBudgetAgent AI call failed, utilizing baseline assumptions', {
+        error: err instanceof Error ? err.message : 'Unknown error',
+      });
+    }
   }
 
   // Strictly compute arithmetic via the Deterministic Engine
@@ -140,21 +145,21 @@ Return JSON only.`;
     Math.max(40, Math.round(55 + Math.min(30, scenarios.expected.runwayMonths * 3.5)))
   );
 
-  const candidate = {
+  return {
     agentId: 'finance_budget',
     name: 'Finance & Budget Agent',
-    score: response.parsed.score ? Math.min(100, Math.max(0, response.parsed.score)) : deterministicScore,
-    confidence: response.parsed.confidence ?? 0.88,
-    executiveSummary: response.parsed.executiveSummary || `With an initial capital base of ₹${baselineBudgetINR.toLocaleString()} INR, the expected scenario provides approximately ${scenarios.expected.runwayMonths} months of operating runway. Break-even is realistically modeled around month ${scenarios.expected.breakEvenMonth || '10+'}.`,
+    score: deterministicScore,
+    confidence: 0.88,
+    executiveSummary: `With an initial capital base of ₹${baselineBudgetINR.toLocaleString()} INR, the expected scenario provides approximately ${scenarios.expected.runwayMonths} months of operating runway. Break-even is realistically modeled around month ${scenarios.expected.breakEvenMonth || '10+'}.`,
     startingBudgetINR: baselineBudgetINR,
     budgetSource: isAiEstimated ? 'AI_ESTIMATED' : 'USER_PROVIDED',
     budgetCertainty: !isAiEstimated,
-    initialSetupCosts: response.parsed.initialCostItems || [
+    initialSetupCosts: [
       { item: 'Company Incorporation & Professional Compliance', amountINR: Math.round(initialSetupCost * 0.25), category: 'Legal & Accounting' },
       { item: 'Branding, Domain, SSL & Workspace Tooling', amountINR: Math.round(initialSetupCost * 0.25), category: 'Tools & Identity' },
       { item: 'Initial UI/UX Assets & Development Toolchain', amountINR: Math.round(initialSetupCost * 0.5), category: 'Product' },
     ],
-    monthlyOperatingCosts: response.parsed.monthlyOpExItems || [
+    monthlyOperatingCosts: [
       { item: 'Cloud Compute, Managed DB & Edge Network', amountINR: Math.round(monthlyOpEx * 0.25), category: 'Infrastructure' },
       { item: 'Targeted Customer Acquisition & Ad Experiments', amountINR: Math.round(monthlyOpEx * 0.45), category: 'Growth & Marketing' },
       { item: 'Software Licenses, Messaging & Support API', amountINR: Math.round(monthlyOpEx * 0.3), category: 'Operational SaaS' },
@@ -181,13 +186,12 @@ Return JSON only.`;
     ],
     strengths: [
       'Lean software development cost structure minimizes heavy fixed asset investments',
-      'Clear visibility into unit economic levers and variable growth expenses',
+      'Clear visibility into unit unit economic levers and variable growth expenses',
     ],
     weaknesses: [
       'Limited capital buffer requires strict milestone-driven spending before scaling paid ads',
     ],
     assumptions: [
-      `Budget source is ${isAiEstimated ? 'AI_ESTIMATED baseline model' : 'USER_PROVIDED inputs'}.`,
       'Operating costs reflect typical Indian tech startup benchmarks without expensive full-time agency retainers',
       'Revenue projections assume 15% month-over-month growth following public launch',
     ],
@@ -197,16 +201,10 @@ Return JSON only.`;
           'Reserve at least 15% of initial capital as an emergency buffer for unexpected infrastructure or compliance needs',
           'Prioritize organic channels and referral loops to maintain low blended CAC during months 1 through 6',
         ],
-    sources: response.parsed.sources || [],
-    limitations: response.parsed.limitations || ['Projections are modeled scenario estimates. Deterministic FinanceCalculationEngine computed final arithmetic.'],
-    executionMode: 'live_gemini',
+    sources: [],
+    limitations: ['Projections are modeled scenario estimates. Founder must track actual monthly cash burn in real time.'],
+    executionMode: aiUsed ? (providerName === 'ollama' ? 'live_ollama' : 'live_gemini') : 'deterministic_fallback',
+    provider: providerName,
+    model: modelName,
   };
-
-  const validation = FinanceBudgetOutputSchema.safeParse(candidate);
-  if (!validation.success) {
-    logger.error('FinanceBudgetAgent output schema validation failed', { errors: validation.error.format() });
-    throw new Error(`FinanceBudgetAgent output validation failed: ${validation.error.message}`);
-  }
-
-  return validation.data as FinanceBudgetOutput;
 }

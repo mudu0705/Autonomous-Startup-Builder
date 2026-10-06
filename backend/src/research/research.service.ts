@@ -1,14 +1,15 @@
 import mongoose from 'mongoose';
 import { SourceModel, ISourceDocument } from '../models/Source.ts';
 import type { IResearchProvider, ISearchResult } from './research.interface.ts';
-import { tavilyResearchProvider } from './tavily.research.provider.ts';
+import { googleResearchProvider } from './google.research.provider.ts';
+import { gitHubResearchProvider } from './github.research.provider.ts';
 import type { SourceReference, AgentId } from '../../../shared/types/agent.ts';
 import { logger } from '../config/logger.ts';
 
 export class ResearchService {
   private provider: IResearchProvider;
 
-  constructor(provider: IResearchProvider = tavilyResearchProvider) {
+  constructor(provider: IResearchProvider = googleResearchProvider) {
     this.provider = provider;
   }
 
@@ -18,6 +19,65 @@ export class ResearchService {
 
   public isAvailable(): boolean {
     return this.provider.isAvailable();
+  }
+
+  public isGitHubAvailable(): boolean {
+    return gitHubResearchProvider.isAvailable();
+  }
+
+  /**
+   * Executes optional GitHub public API research for open-source alternatives and software benchmarks.
+   */
+  public async researchGitHub(
+    analysisId: string,
+    agentId: AgentId,
+    query: string,
+    claimSupported?: string
+  ): Promise<SourceReference[]> {
+    try {
+      const results = await gitHubResearchProvider.search(query, { maxResults: 3 });
+      if (results.length === 0) {
+        return [];
+      }
+
+      const sourceRefs: SourceReference[] = [];
+
+      for (const res of results) {
+        if (!res.title || !res.url) continue;
+
+        const doc = await SourceModel.create({
+          analysisId: new mongoose.Types.ObjectId(analysisId),
+          agentId,
+          title: res.title,
+          url: res.url,
+          domain: res.domain || 'github.com',
+          snippet: res.snippet || '',
+          reliabilityScore: res.reliabilityScore || 80,
+          publishedDate: res.publishedDate,
+          retrievedAt: new Date(),
+        });
+
+        sourceRefs.push({
+          title: doc.title,
+          url: doc.url,
+          publisher: 'GitHub Open Source',
+          sourceType: 'company',
+          publishedDate: doc.publishedDate,
+          retrievedAt: doc.retrievedAt.toISOString(),
+          agentId,
+          claimSupported,
+        });
+      }
+
+      return sourceRefs;
+    } catch (err) {
+      logger.warn('GitHub research encountered an error', {
+        agentId,
+        query,
+        error: err instanceof Error ? err.message : 'Unknown error',
+      });
+      return [];
+    }
   }
 
   /**

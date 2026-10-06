@@ -14,3 +14,18 @@ export interface HealthResponse {
     nodeVersion?: string;
   };
 }
+
+export interface AIHealthResponse {
+  ollama: {
+    available: boolean;
+    model: string;
+  };
+  gemini: {
+    available: boolean;
+  };
+  research: {
+    available: boolean;
+  };
+  activeProvider: 'ollama' | 'gemini' | 'none';
+  configuredMode?: 'ollama' | 'gemini' | 'auto';
+}

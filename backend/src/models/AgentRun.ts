@@ -12,6 +12,8 @@ export interface IAgentRunDocument extends Document {
   error?: string;
   retryCount: number;
   durationMs?: number;
+  provider?: string;
+  modelName?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -56,6 +58,12 @@ const AgentRunSchema = new Schema<IAgentRunDocument>(
     },
     durationMs: {
       type: Number,
+    },
+    provider: {
+      type: String,
+    },
+    modelName: {
+      type: String,
     },
   },
   {

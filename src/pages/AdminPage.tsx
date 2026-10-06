@@ -155,18 +155,38 @@ export const AdminPage: React.FC<AdminPageProps> = ({ navigate }) => {
 
           <div className="p-3 rounded-lg bg-slate-950 border border-slate-800 space-y-1">
             <div className="flex items-center justify-between text-slate-400">
-              <span className="flex items-center gap-1.5"><Cpu className="h-3.5 w-3.5 text-emerald-400" /> AI Provider</span>
-              <span className="text-[10px] font-mono text-emerald-400">{health?.aiProvider?.available ? 'Active' : 'Offline'}</span>
+              <span className="flex items-center gap-1.5"><Cpu className="h-3.5 w-3.5 text-emerald-400" /> Ollama Local</span>
+              <span className={`text-[10px] font-mono ${health?.aiProvider?.ollama?.available ? 'text-emerald-400' : 'text-slate-500'}`}>
+                {health?.aiProvider?.ollama?.available ? 'Online' : 'Offline'}
+              </span>
             </div>
-            <div className="text-slate-200 font-mono text-[11px] pt-1">{health?.aiProvider?.model || 'gemini-3.8-flash'}</div>
+            <div className="text-slate-200 font-mono text-[11px] pt-1 truncate">
+              {health?.aiProvider?.ollama?.model || 'qwen2.5-coder:7b'}
+            </div>
           </div>
 
           <div className="p-3 rounded-lg bg-slate-950 border border-slate-800 space-y-1">
             <div className="flex items-center justify-between text-slate-400">
-              <span className="flex items-center gap-1.5"><Globe className="h-3.5 w-3.5 text-emerald-400" /> Search Provider</span>
-              <span className="text-[10px] font-mono text-slate-400">{health?.researchProvider?.mode || 'Analytical'}</span>
+              <span className="flex items-center gap-1.5"><Cpu className="h-3.5 w-3.5 text-sky-400" /> Gemini Cloud</span>
+              <span className={`text-[10px] font-mono ${health?.aiProvider?.gemini?.available ? 'text-sky-400' : 'text-slate-500'}`}>
+                {health?.aiProvider?.gemini?.available ? 'Active' : 'Unconfigured'}
+              </span>
             </div>
-            <div className="text-slate-200 font-mono text-[11px] pt-1">Google Grounding API</div>
+            <div className="text-slate-200 font-mono text-[11px] pt-1 truncate">
+              {health?.aiProvider?.gemini?.model || 'gemini-3.8-flash'}
+            </div>
+          </div>
+
+          <div className="p-3 rounded-lg bg-slate-950 border border-slate-800 space-y-1">
+            <div className="flex items-center justify-between text-slate-400">
+              <span className="flex items-center gap-1.5"><Globe className="h-3.5 w-3.5 text-emerald-400" /> Research Grounding</span>
+              <span className={`text-[10px] font-mono ${health?.researchProvider?.available ? 'text-emerald-400' : 'text-slate-500'}`}>
+                {health?.researchProvider?.available ? 'Live Search' : 'Analytical'}
+              </span>
+            </div>
+            <div className="text-slate-200 font-mono text-[11px] pt-1">
+              {health?.researchProvider?.githubAvailable ? 'Google + GitHub' : 'Google Search'}
+            </div>
           </div>
 
           <div className="p-3 rounded-lg bg-slate-950 border border-slate-800 space-y-1">

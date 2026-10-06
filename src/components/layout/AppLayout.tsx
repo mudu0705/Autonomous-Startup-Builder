@@ -2,6 +2,7 @@ import React from 'react';
 import { Button } from '../common/Button.tsx';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { User as UserIcon, LogOut } from 'lucide-react';
+import { AiStatusIndicator } from './AiStatusIndicator.tsx';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -67,8 +68,9 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, currentPath, nav
             ))}
           </nav>
 
-          {/* Zone 3: Dynamic Auth User Actions */}
+          {/* Zone 3: Dynamic Auth User Actions & AI Status */}
           <div className="flex items-center gap-3">
+            <AiStatusIndicator />
             {isAuthenticated && user ? (
               <div className="flex items-center gap-3">
                 <button

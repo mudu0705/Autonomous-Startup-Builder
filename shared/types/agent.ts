@@ -51,7 +51,9 @@ export interface BaseAgentOutput {
   recommendations: string[];
   sources: SourceReference[];
   limitations: string[];
-  executionMode?: 'live_gemini' | 'deterministic_fallback';
+  executionMode?: 'live_gemini' | 'live_ollama' | 'live_ai' | 'deterministic_fallback';
+  provider?: string;
+  model?: string;
 }
 
 export interface IdeaProblemOutput extends BaseAgentOutput {
@@ -107,9 +109,6 @@ export interface CompetitorAnalysisOutput extends BaseAgentOutput {
     whatCompetitorsAreMissing: string[];
     whatCustomersAreMissing: string[];
     underservedSegments: string[];
-    whitespace?: string[];
-    whatStartupCanDoDifferently?: string[];
-    whatStartupShouldNotCopy?: string[];
     differentiationOpportunities: string[];
     proposedAdvantage: string;
   };
@@ -123,7 +122,6 @@ export interface ValidationHypothesis {
   suggestedSampleSize: string;
   successMetric: string;
   expectedResult: string;
-  failureCondition?: string;
   risks: string[];
   recommendation: string;
 }
