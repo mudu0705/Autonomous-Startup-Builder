@@ -9,6 +9,7 @@ import type {
   IntakeConversationData,
 } from '../../../shared/types/intake.ts';
 import { extractIntakeInformation } from './intake.extractor.ts';
+import { projectService } from './project.service.ts';
 import { NotFoundError } from '../utils/errors.ts';
 import { logger } from '../config/logger.ts';
 
@@ -46,6 +47,8 @@ const REQUIRED_CATEGORIES: IntakeCategory[] = [
 ];
 
 export class ConversationService {
+  private readonly memoryConversations = new Map<string, any>();
+
   /**
    * Evaluates which categories are satisfied and calculates completion progress.
    */
@@ -143,18 +146,70 @@ export class ConversationService {
     projectId: string,
     userId: string
   ): Promise<IConversationDocument> {
-    if (!mongoose.Types.ObjectId.isValid(projectId)) {
-      throw new NotFoundError('Project not found');
-    }
-
-    // Validate project ownership
-    const project = await ProjectModel.findOne({
-      _id: new mongoose.Types.ObjectId(projectId),
-      userId: new mongoose.Types.ObjectId(userId),
-    });
-
+    const project = await projectService.getUserProjectById(userId, projectId);
     if (!project) {
       throw new NotFoundError('Project not found or unauthorized');
+    }
+
+    if (mongoose.connection.readyState !== 1) {
+      let conversation = this.memoryConversations.get(projectId);
+      if (!conversation) {
+        const initialState: IntakeStructuredState = {
+          startupIdea: project.startupIdea || null,
+          proposedSolution: project.proposedSolution || null,
+          startupName: project.name || null,
+          targetCustomers: project.targetCustomers || null,
+          location: project.location
+            ? {
+                country: 'India',
+                scope: project.location.scope || null,
+                locations: project.location.locations || [],
+                source: 'user_provided',
+              }
+            : { country: 'India', scope: null, locations: [] },
+          budget: project.budget
+            ? {
+                amount: project.budget.amount,
+                minAmount: null,
+                maxAmount: null,
+                currency: 'INR',
+                source: project.budget.source === 'AI_ESTIMATED' ? 'ai_estimated' : 'user_provided',
+                confidence: 1,
+              }
+            : { amount: null, minAmount: null, maxAmount: null, currency: 'INR', source: null, confidence: null },
+          revenueModel: project.revenueModel || null,
+          additionalInformation: project.additionalInformation || null,
+          analysisDepth: project.analysisDepth || null,
+          fieldSources: {
+            startupIdea: project.startupIdea ? 'user_provided' : undefined,
+            startupName: project.name ? 'user_provided' : undefined,
+          },
+        };
+
+        const { completedCategories, readyForAnalysis } = this.evaluateProgress(initialState);
+        const next = this.getNextQuestion(initialState, completedCategories);
+
+        conversation = {
+          _id: new mongoose.Types.ObjectId().toHexString(),
+          projectId,
+          userId,
+          title: `${project.name || 'Startup'} Intake`,
+          messages: [
+            {
+              role: 'assistant',
+              content: `Welcome to the Autonomous Startup Builder intake! ${next.question}`,
+              timestamp: new Date(),
+            },
+          ],
+          structuredState: initialState,
+          currentCategory: next.category,
+          readyForAnalysis,
+          completedCategories,
+          save: async () => {},
+        };
+        this.memoryConversations.set(projectId, conversation);
+      }
+      return conversation;
     }
 
     let conversation = await ConversationModel.findOne({
@@ -328,6 +383,11 @@ export class ConversationService {
       };
     }
 
+    if (mongoose.connection.readyState !== 1) {
+      await projectService.updateUserProject(userId, projectId, updatePayload as any);
+      return;
+    }
+
     await ProjectModel.updateOne(
       {
         _id: new mongoose.Types.ObjectId(projectId),
@@ -353,7 +413,7 @@ export class ConversationService {
     return {
       projectId: conversation.projectId.toString(),
       userId: conversation.userId.toString(),
-      messages: conversation.messages.map((m) => ({
+      messages: conversation.messages.map((m: any) => ({
         role: m.role,
         content: m.content,
         timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : String(m.timestamp),
@@ -370,6 +430,19 @@ export class ConversationService {
    * Resets the intake conversation and state for a project without deleting the project.
    */
   public async resetConversation(projectId: string, userId: string): Promise<IntakeConversationData> {
+    if (mongoose.connection.readyState !== 1) {
+      this.memoryConversations.delete(projectId);
+      await projectService.updateUserProject(userId, projectId, {
+        proposedSolution: undefined,
+        targetCustomers: undefined,
+        revenueModel: undefined,
+        additionalInformation: undefined,
+        intakeProgress: 0,
+        status: 'DRAFT',
+      } as any);
+      return await this.getConversationData(projectId, userId);
+    }
+
     if (!mongoose.Types.ObjectId.isValid(projectId)) {
       throw new NotFoundError('Project not found');
     }
@@ -440,6 +513,16 @@ export class ConversationService {
       throw new Error('All 6 required categories must be completed before confirming intake.');
     }
 
+    if (mongoose.connection.readyState !== 1) {
+      await projectService.updateUserProject(userId, projectId, {
+        status: 'READY_FOR_ANALYSIS',
+        intakeProgress: 100,
+      } as any);
+      conversation.readyForAnalysis = true;
+      logger.info('Project intake confirmed in memory fallback', { projectId, userId });
+      return { success: true, status: 'READY_FOR_ANALYSIS' };
+    }
+
     await ProjectModel.updateOne(
       {
         _id: new mongoose.Types.ObjectId(projectId),
@@ -454,7 +537,7 @@ export class ConversationService {
     );
 
     conversation.readyForAnalysis = true;
-    await conversation.save();
+    if (conversation.save) await conversation.save();
 
     logger.info('Project intake confirmed and marked READY_FOR_ANALYSIS', { projectId, userId });
     return { success: true, status: 'READY_FOR_ANALYSIS' };

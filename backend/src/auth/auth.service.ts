@@ -39,11 +39,16 @@ interface MemoryUserRecord {
 
 export class AuthService implements IAuthService {
   private readonly memoryUsers = new Map<string, MemoryUserRecord>();
+  private readonly hasher: PasswordHasher;
+  private readonly tokenManager: TokenManager;
 
   constructor(
-    private readonly hasher: PasswordHasher = argon2Hasher,
-    private readonly tokenManager: TokenManager = jwtTokenManager
-  ) {}
+    hasher: PasswordHasher = argon2Hasher,
+    tokenManager: TokenManager = jwtTokenManager
+  ) {
+    this.hasher = hasher;
+    this.tokenManager = tokenManager;
+  }
 
   /**
    * Registers a new user with email normalization, Argon2 password hashing,
