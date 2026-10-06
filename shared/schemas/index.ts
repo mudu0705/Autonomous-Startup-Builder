@@ -77,4 +77,6 @@ export type ProjectCreateOutput = z.output<typeof ProjectCreateSchema>;
 export type ProjectUpdateInput = z.infer<typeof ProjectUpdateSchema>;
 
 export * from './intake.schema.ts';
+export * from './agentOutputs.schema.ts';
+
 

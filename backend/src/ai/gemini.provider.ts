@@ -8,12 +8,13 @@ export class GeminiProvider implements IAIProvider {
   public readonly providerName = 'google-gemini';
   private client: GoogleGenAI | null = null;
 
-  // Ordered candidate models: prioritizes flash-lite for high throughput and separate free-tier quota pool
-  private readonly candidateModels: string[] = [
-    'gemini-3.1-flash-lite',
+  private readonly candidateModels: string[] = ([
     process.env.GEMINI_MODEL,
     'gemini-3.8-flash',
-  ].filter((m, idx, arr): m is string => Boolean(m) && m.trim().length > 0 && arr.indexOf(m) === idx);
+    'gemini-3.1-flash-lite',
+  ] as (string | undefined)[])
+    .filter((m): m is string => typeof m === 'string' && m.trim().length > 0)
+    .filter((m, idx, arr) => arr.indexOf(m) === idx);
 
   // Set of models that have hit daily free-tier quota limits (e.g., 20/day) during this session
   private readonly exhaustedModels = new Set<string>();
@@ -55,9 +56,6 @@ export class GeminiProvider implements IAIProvider {
   }
 
   public isAvailable(): boolean {
-    if (process.env.NODE_ENV === 'test') {
-      return false;
-    }
     return this.getClient() !== null;
   }
 

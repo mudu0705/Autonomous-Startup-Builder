@@ -107,6 +107,9 @@ export interface CompetitorAnalysisOutput extends BaseAgentOutput {
     whatCompetitorsAreMissing: string[];
     whatCustomersAreMissing: string[];
     underservedSegments: string[];
+    whitespace?: string[];
+    whatStartupCanDoDifferently?: string[];
+    whatStartupShouldNotCopy?: string[];
     differentiationOpportunities: string[];
     proposedAdvantage: string;
   };
@@ -120,6 +123,7 @@ export interface ValidationHypothesis {
   suggestedSampleSize: string;
   successMetric: string;
   expectedResult: string;
+  failureCondition?: string;
   risks: string[];
   recommendation: string;
 }
