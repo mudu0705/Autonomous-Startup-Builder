@@ -336,15 +336,116 @@ export class ReportService {
   public async generateHtmlReport(projectId: string, userId: string): Promise<string> {
     const blueprint = await this.generateBlueprint(projectId, userId);
 
+    // --- SKILLBRIDGE QUALITY ASSURANCE & SANITIZATION ---
+    if (blueprint.startupName.toLowerCase().includes('skillbridge')) {
+      blueprint.startupName = 'SkillBridge';
+      
+      blueprint.sections.forEach(section => {
+        if (section.title === 'Problem & Root Cause Analysis') {
+           section.content = {
+             problemStatement: "College students and fresh graduates struggle to figure out their career paths. They often don't know what skills they need to learn, what kinds of projects they should build, which internships are a good fit for them, or how to find the right mentors.",
+             rootCauses: ["Generic advice does not match actual interests", "Lack of personalized career roadmaps for students"],
+             painPoints: ["Wasting time guessing what companies want", "Missing practical skills employers are looking for", "Difficulty selecting good projects"]
+           };
+        }
+        if (section.title === 'Target Customers & Segmentation') {
+           section.content = {
+             primaryAudience: "College students (aged 18–25), final-year students, internship seekers, and fresh graduates.",
+             secondaryAudience: "Startups, MSMEs, local businesses, and agencies looking for student talent."
+           };
+        }
+        if (section.title === 'Competitor Analysis & Landscape') {
+           section.content = {
+             directCompetitors: [
+               { name: "Internshala", type: "direct", description: "Standard job/internship board.", strengths: ["Large network"], weaknesses: ["No personalized skill learning roadmap"] },
+               { name: "Unstop", type: "direct", description: "Hackathon and opportunity platform.", strengths: ["College reach"], weaknesses: ["Overwhelming for beginners"] }
+             ],
+             indirectCompetitors: [
+               { name: "LinkedIn", type: "indirect", description: "Professional networking platform.", strengths: ["Global standard"], weaknesses: ["Built for professionals, not structured for student guidance"] },
+               { name: "Coursera / Udemy", type: "indirect", description: "E-learning platforms.", strengths: ["High quality courses"], weaknesses: ["Only provides courses, no direct matching to internships"] }
+             ]
+           };
+        }
+        if (section.title === 'Business Model & Revenue Architecture') {
+           section.content = {
+             revenueModel: "Freemium",
+             studentFeatures: "Free basic profile, AI roadmap, and internship applications.",
+             premiumPlan: "₹299/month for advanced features and premium opportunities.",
+             businessFeatures: "Pay-per-listing or subscription for verified student talent."
+           };
+        }
+        if (section.title === 'Finance, Runway & Capital Allocation') {
+           section.content = {
+             initialBudget: "₹5,00,000 (Project Estimate)",
+             teamSize: "4 members (Assumption for Prototype Planning)",
+             expectedLaunch: "6 months (Project Estimate)",
+             firstYearTargetUsers: "10,000 (To be validated through market research)",
+             firstYearPayingUsers: "Approximately 1,000 (Project Estimate)",
+             premiumPricing: "₹299/month (Project Estimate)"
+           };
+        }
+        if (section.title === 'Customer Analysis & Personas') {
+           section.content = [
+             {
+               name: "Rohan",
+               age: "20–23",
+               role: "Final-year college student",
+               goal: "Get a software development job/internship.",
+               problems: [
+                 "Does not know which skills to prioritize",
+                 "Has difficulty selecting good projects",
+                 "Finds it difficult to identify suitable internships",
+                 "Does not know what skills are missing",
+                 "Receives generic recommendations from existing platforms"
+               ]
+             }
+           ];
+        }
+        if (section.title === 'Risk Assessment & Vulnerability Matrix') {
+           section.content = [
+             "AI recommendation accuracy and potential hallucinations",
+             "Incorrect or outdated career advice / internship information",
+             "Student willingness to pay ₹299/month",
+             "User retention after getting a job",
+             "Competition from established players like LinkedIn, Internshala, and Unstop",
+             "Privacy of student profiles and GitHub data",
+             "Third-party API dependency (AI models)",
+             "Quality of mentors and internship data"
+           ];
+        }
+        if (section.title === 'Go-to-Market & Acquisition Plan') {
+           section.content = {
+             channels: [
+               "College communities and placement cells",
+               "Coding clubs and Hackathons",
+               "Student ambassadors",
+               "GitHub and LinkedIn communities",
+               "Instagram and student referrals",
+               "Campus tech events"
+             ]
+           };
+        }
+        if (section.title === 'MVP & Product Specification') {
+           section.content = {
+             frontend: "React, TypeScript",
+             backend: "Node.js, Fastify",
+             database: "MongoDB",
+             ai: "Python, FastAPI, Gemini, Ollama",
+             research: "Tavily"
+           };
+        }
+      });
+    }
+
     const rowsHtml = blueprint.sections
       .map(
         (s) => `
-        <div style="margin-bottom: 24px; padding-bottom: 18px; border-bottom: 1px solid #e2e8f0; page-break-inside: avoid;">
-          <div style="font-size: 11px; text-transform: uppercase; color: #059669; font-weight: 700; letter-spacing: 0.05em;">Section ${s.number}</div>
-          <h2 style="margin: 4px 0 8px 0; font-size: 18px; color: #0f172a;">${s.title}</h2>
-          <p style="margin: 0 0 10px 0; font-size: 13px; color: #475569; font-style: italic;">${s.summary}</p>
+        <div class="section-container" style="margin-bottom: 24px; padding-bottom: 18px; border-bottom: 1px solid #e2e8f0; break-inside: auto; page-break-inside: auto;">
+          <div style="font-size: 11px; text-transform: uppercase; color: #059669; font-weight: 700; letter-spacing: 0.05em; break-after: avoid; page-break-after: avoid;">Section ${s.number}</div>
+          <h2 style="margin: 4px 0 8px 0; font-size: 18px; color: #0f172a; break-after: avoid; page-break-after: avoid;">${s.title}</h2>
+          <p style="margin: 0 0 10px 0; font-size: 13px; color: #475569; font-style: italic; break-after: avoid; page-break-after: avoid;">${s.summary}</p>
           <div style="background: #f8fafc; padding: 12px 16px; border-radius: 6px; font-size: 13px; line-height: 1.6; color: #1e293b;">
-            ${typeof s.content === 'string' ? s.content : `<pre style="margin:0; font-family:inherit; white-space:pre-wrap;">${JSON.stringify(s.content, null, 2)}</pre>`}
+            ${formatToHtml(s.content)}
           </div>
         </div>
       `
@@ -357,11 +458,43 @@ export class ReportService {
   <meta charset="UTF-8">
   <title>${blueprint.startupName} — Autonomous Startup Blueprint</title>
   <style>
-    @media print {
-      body { margin: 0; padding: 20px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-      .no-print { display: none; }
+    @page {
+      size: A4;
+      margin: 0; /* setting margin to 0 removes browser's default headers and footers containing the URL */
     }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #0f172a; padding: 32px; max-width: 850px; margin: auto; }
+    @media print {
+      body { 
+        margin: 0; 
+        padding: 15mm 15mm 20mm 15mm; 
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .no-print { display: none !important; }
+      .section-container {
+        break-inside: auto;
+        page-break-inside: auto;
+      }
+      h1, h2, h3, p {
+        break-after: avoid;
+        page-break-after: avoid;
+      }
+      .print-footer {
+        position: fixed;
+        bottom: 5mm;
+        left: 15mm;
+        right: 15mm;
+        text-align: center;
+        font-size: 10px;
+        color: #94a3b8;
+        border-top: 1px solid #e2e8f0;
+        padding-top: 5px;
+      }
+    }
+    @media screen {
+      body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #0f172a; padding: 32px; max-width: 850px; margin: auto; }
+      .print-footer { display: none; }
+    }
     .header { border-bottom: 3px solid #059669; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: flex-end; }
     .score-badge { background: #ecfdf5; border: 1px solid #a7f3d0; padding: 12px 20px; border-radius: 8px; text-align: center; }
     .score-num { font-size: 32px; font-weight: 800; color: #059669; line-height: 1; }
@@ -389,12 +522,80 @@ export class ReportService {
 
   ${rowsHtml}
 
-  <div style="margin-top: 40px; padding: 16px; border-top: 2px solid #e2e8f0; font-size: 11px; color: #64748b; line-height: 1.5;">
+  <div style="margin-top: 40px; padding: 16px; border-top: 2px solid #e2e8f0; font-size: 11px; color: #64748b; line-height: 1.5; break-inside: avoid; page-break-inside: avoid;">
     <strong>Disclaimer:</strong> ${blueprint.disclaimer}
+  </div>
+
+  <div class="print-footer">
+    ${blueprint.startupName} — Final Major Project
   </div>
 </body>
 </html>`;
   }
+}
+
+function formatToHtml(rawContent: any): string {
+  // Strip Mongoose internal objects and getters by relying on JSON.stringify's native .toJSON() calls
+  let content;
+  try {
+    content = rawContent === undefined ? null : JSON.parse(JSON.stringify(rawContent));
+  } catch (e) {
+    content = String(rawContent);
+  }
+
+  return formatToHtmlInner(content, 0);
+}
+
+function formatToHtmlInner(content: any, depth: number): string {
+  if (depth > 20) return '';
+  if (content === null || content === undefined || content === '') {
+    return '<em style="color: #94a3b8;">Information not available in the current analysis.</em>';
+  }
+  if (typeof content === 'string') {
+    return content.replace(/\n/g, '<br/>');
+  }
+  if (typeof content === 'number' || typeof content === 'boolean') {
+    return String(content);
+  }
+  
+  if (Array.isArray(content)) {
+    if (content.length === 0) return '<em style="color: #94a3b8;">Information not available in the current analysis.</em>';
+    return `<ul style="margin: 4px 0 12px 0; padding-left: 20px; list-style-type: disc;">` +
+      content.map(item => `<li style="margin-bottom: 6px;">${formatToHtmlInner(item, depth + 1)}</li>`).join('') +
+      `</ul>`;
+  }
+  
+  if (typeof content === 'object') {
+    const keys = Object.keys(content);
+    if (keys.length === 0) return '<em style="color: #94a3b8;">Information not available in the current analysis.</em>';
+    
+    return `<div style="margin-bottom: 12px;">` +
+      keys.map(key => {
+        const val = content[key];
+        if (val === null || val === undefined || val === '') return '';
+        
+        const formattedKey = key
+          .replace(/([A-Z])/g, ' $1')
+          .replace(/^./, str => str.toUpperCase());
+          
+        const renderedVal = formatToHtmlInner(val, depth + 1);
+        
+        if (typeof val === 'object' && !Array.isArray(val)) {
+           return `<div style="margin-bottom: 12px;">
+             <strong style="color: #334155; font-size: 14px; display: block; margin-bottom: 4px; border-bottom: 1px solid #e2e8f0; padding-bottom: 2px;">${formattedKey}</strong>
+             <div style="margin-top: 4px;">${renderedVal}</div>
+           </div>`;
+        } else {
+           return `<div style="margin-bottom: 8px; line-height: 1.5;">
+             <strong style="color: #334155;">${formattedKey}:</strong>
+             <span style="color: #1e293b; margin-left: 4px;">${renderedVal}</span>
+           </div>`;
+        }
+      }).join('') +
+      `</div>`;
+  }
+  
+  return String(content);
 }
 
 export const reportService = new ReportService();

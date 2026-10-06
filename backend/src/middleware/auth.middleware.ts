@@ -16,15 +16,17 @@ declare module 'fastify' {
  */
 export function requireAuth() {
   return async (request: FastifyRequest, _reply: FastifyReply): Promise<void> => {
-    const authHeader = request.headers.authorization;
+    let token: string | undefined;
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new UnauthorizedError('Authorization header with Bearer token is required');
+    const authHeader = request.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7).trim();
+    } else if (typeof (request.query as any)?.token === 'string') {
+      token = (request.query as any).token.trim();
     }
 
-    const token = authHeader.substring(7).trim();
     if (!token) {
-      throw new UnauthorizedError('Bearer token cannot be empty');
+      throw new UnauthorizedError('Authorization header with Bearer token is required');
     }
 
     // Verify token identity using TokenManager

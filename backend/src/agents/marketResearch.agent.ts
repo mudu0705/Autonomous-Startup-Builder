@@ -26,16 +26,37 @@ export async function runMarketResearchAgent(
 
   // 1. Gather live research if research service provider is configured
   let verifiedSources: SourceReference[] = [];
-  const searchQuery = `${idea} market trends India ${audience}`;
-
+  
   if (researchService.isAvailable()) {
     try {
-      verifiedSources = await researchService.research(
-        analysisId,
-        'market_research',
-        searchQuery,
-        'Indian market demand indicators and trends'
-      );
+      const queries = [`${idea} market trends India ${audience}`];
+      
+      if (depth === 'standard' || depth === 'deep') {
+        queries.push(`${idea} market size and demand India`);
+      }
+      
+      if (depth === 'deep') {
+        queries.push(`${idea} target market ${audience} characteristics India`);
+        queries.push(`${idea} industry challenges opportunities India`);
+      }
+
+      for (const query of queries) {
+        const sources = await researchService.research(
+          analysisId,
+          'market_research',
+          query,
+          'Market analysis and trends'
+        );
+        verifiedSources.push(...sources);
+      }
+      
+      // Deduplicate sources by URL
+      const uniqueUrls = new Set<string>();
+      verifiedSources = verifiedSources.filter(source => {
+        if (!source.url || uniqueUrls.has(source.url)) return false;
+        uniqueUrls.add(source.url);
+        return true;
+      });
     } catch (err) {
       logger.warn('Market research search query encountered an error', { error: err });
     }

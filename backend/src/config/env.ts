@@ -10,6 +10,7 @@ const envSchema = z.object({
   MONGODB_URI: z.string().optional().default(''),
   JWT_SECRET: z.string().default('dev-jwt-secret-do-not-use-in-production'),
   GEMINI_API_KEY: z.string().optional().default(''),
+  TAVILY_API_KEY: z.string().optional().default(''),
   APP_URL: z.string().optional().default(''),
 });
 

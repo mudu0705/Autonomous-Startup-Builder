@@ -11,12 +11,14 @@ export async function runCompetitorAnalysisAgent(
     proposedSolution?: string;
     targetCustomers?: string;
     location?: { country: string; scope: string; locations: string[] };
+    analysisDepth?: 'quick' | 'standard' | 'deep';
   },
   analysisId: string
 ): Promise<CompetitorAnalysisOutput> {
   const startupName = project.name || 'Your Startup';
   const idea = project.startupIdea;
   const audience = project.targetCustomers || 'Indian market';
+  const depth = project.analysisDepth || 'standard';
 
   if (!geminiProvider.isAvailable()) {
     throw new Error('Gemini AI Provider is not available. GEMINI_API_KEY is required for Competitor Analysis Agent analysis.');
@@ -25,12 +27,33 @@ export async function runCompetitorAnalysisAgent(
   let verifiedSources: SourceReference[] = [];
   if (researchService.isAvailable()) {
     try {
-      verifiedSources = await researchService.research(
-        analysisId,
-        'competitor_analysis',
-        `competitors alternatives ${idea} India`,
-        'Indian competitor landscape and market gaps'
-      );
+      const queries = [`competitors alternatives ${idea} India`];
+      
+      if (depth === 'standard' || depth === 'deep') {
+        queries.push(`${idea} software tools startups India`);
+      }
+      
+      if (depth === 'deep') {
+        queries.push(`pricing and features of ${idea} competitors India`);
+      }
+
+      for (const query of queries) {
+        const sources = await researchService.research(
+          analysisId,
+          'competitor_analysis',
+          query,
+          'Competitor landscape and pricing'
+        );
+        verifiedSources.push(...sources);
+      }
+      
+      // Deduplicate sources by URL
+      const uniqueUrls = new Set<string>();
+      verifiedSources = verifiedSources.filter(source => {
+        if (!source.url || uniqueUrls.has(source.url)) return false;
+        uniqueUrls.add(source.url);
+        return true;
+      });
     } catch (err) {
       logger.warn('Competitor research search query failed', { error: err });
     }

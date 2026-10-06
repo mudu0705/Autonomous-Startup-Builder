@@ -1,14 +1,14 @@
 import mongoose from 'mongoose';
 import { SourceModel, ISourceDocument } from '../models/Source.ts';
 import type { IResearchProvider, ISearchResult } from './research.interface.ts';
-import { googleResearchProvider } from './google.research.provider.ts';
+import { tavilyResearchProvider } from './tavily.research.provider.ts';
 import type { SourceReference, AgentId } from '../../../shared/types/agent.ts';
 import { logger } from '../config/logger.ts';
 
 export class ResearchService {
   private provider: IResearchProvider;
 
-  constructor(provider: IResearchProvider = googleResearchProvider) {
+  constructor(provider: IResearchProvider = tavilyResearchProvider) {
     this.provider = provider;
   }
 

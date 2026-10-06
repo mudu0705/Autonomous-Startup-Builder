@@ -143,6 +143,8 @@ export const analysisApi = {
    * Returns direct browser URL for printable PDF export.
    */
   getPdfUrl: (projectId: string): string => {
-    return `/api/projects/${projectId}/report/pdf`;
+    const token = tokenStorage.get();
+    const query = token ? `?token=${encodeURIComponent(token)}` : '';
+    return `/api/projects/${projectId}/report/pdf${query}`;
   },
 };
