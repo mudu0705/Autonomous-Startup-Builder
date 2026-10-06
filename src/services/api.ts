@@ -80,6 +80,39 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   return json.data;
 }
 
+export const api = {
+  get: async <T>(endpoint: string, options: RequestInit = {}): Promise<T> => {
+    const token = tokenStorage.get();
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...(options.headers as Record<string, string>),
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    const response = await fetch(endpoint, {
+      ...options,
+      method: 'GET',
+      headers,
+    });
+    const json = await response.json();
+    if (json && typeof json === 'object' && 'success' in json) {
+      if (!json.success) {
+        throw new Error(json.error?.message || 'Request failed');
+      }
+      return json.data as T;
+    }
+    return json as T;
+  },
+  post: async <T>(endpoint: string, body?: unknown, options: RequestInit = {}): Promise<T> => {
+    return request<T>(endpoint, {
+      ...options,
+      method: 'POST',
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  },
+};
+
 export const authApi = {
   register: async (input: UserRegistrationRouteInput): Promise<AuthSession> => {
     const data = await request<AuthSession>('/api/auth/register', {

@@ -5,7 +5,7 @@ import { MongoMemoryServer } from 'mongodb-memory-server';
 import type { FastifyInstance } from 'fastify';
 
 import { buildApp } from '../src/app.ts';
-import { JwtTokenManager } from '../src/auth/jwt.manager.ts';
+import { JwtTokenManager, jwtTokenManager } from '../src/auth/jwt.manager.ts';
 import { AuthService } from '../src/auth/auth.service.ts';
 import { argon2Hasher } from '../src/auth/argon2.hasher.ts';
 import { UserModel } from '../src/models/User.ts';
@@ -467,7 +467,7 @@ describe('Phase 3-9 – Analysis API Routes', () => {
     mongod = await MongoMemoryServer.create();
     await mongoose.connect(mongod.getUri());
 
-    tokenManager = new JwtTokenManager('test-jwt-secret-key-12345', '1h');
+    tokenManager = jwtTokenManager;
     authService = new AuthService(argon2Hasher, tokenManager);
 
     app = await buildApp();
@@ -689,7 +689,7 @@ describe('Phase 3-9 – Admin API Routes (RBAC)', () => {
     mongod = await MongoMemoryServer.create();
     await mongoose.connect(mongod.getUri());
 
-    tokenManager = new JwtTokenManager('test-jwt-secret-key-12345', '1h');
+    tokenManager = jwtTokenManager;
     authService = new AuthService(argon2Hasher, tokenManager);
 
     app = await buildApp();

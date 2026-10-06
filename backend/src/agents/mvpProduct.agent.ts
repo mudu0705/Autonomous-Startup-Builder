@@ -126,6 +126,7 @@ Return JSON only.`;
           recommendations: response.parsed.recommendations || ['Build interactive wireframes and validate with 5 users before writing frontend code', 'Implement automated error logging from day one'],
           sources: [],
           limitations: ['Technical specification scoped for initial launch and first 10,000 users.'],
+          executionMode: 'live_gemini',
         };
       }
     } catch (err) {
@@ -274,5 +275,6 @@ Return JSON only.`;
     ],
     sources: [],
     limitations: ['Architecture optimized for 0 to 10,000 active users with linear horizontal scaling path.'],
+    executionMode: 'deterministic_fallback',
   };
 }

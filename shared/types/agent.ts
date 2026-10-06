@@ -17,6 +17,16 @@ export type AgentExecutionStatus =
   | 'failed'
   | 'skipped';
 
+export interface AgentMetadata {
+  id: AgentId;
+  name: string;
+  order: number;
+  targetPhase: number;
+  isImplemented: boolean;
+  description: string;
+  dependsOn: AgentId[];
+}
+
 export interface SourceReference {
   title: string;
   url?: string;
@@ -41,6 +51,7 @@ export interface BaseAgentOutput {
   recommendations: string[];
   sources: SourceReference[];
   limitations: string[];
+  executionMode?: 'live_gemini' | 'deterministic_fallback';
 }
 
 export interface IdeaProblemOutput extends BaseAgentOutput {

@@ -239,7 +239,7 @@ export class AnalysisOrchestrator {
         agentRun.status = 'completed';
         agentRun.completedAt = new Date();
         agentRun.durationMs = durationMs;
-        agentRun.outputPayload = output as Record<string, unknown>;
+        agentRun.outputPayload = output as unknown as Record<string, unknown>;
         agentRun.error = undefined;
         await agentRun.save();
 

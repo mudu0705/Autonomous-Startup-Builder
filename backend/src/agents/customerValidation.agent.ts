@@ -109,6 +109,7 @@ Return JSON only.`;
           recommendations: response.parsed.recommendations || ['Complete 15 problem-discovery interviews before freezing MVP specifications'],
           sources: [],
           limitations: ['All hypotheses represent proposed validation blueprints. Real customer validation data must be gathered by founder.'],
+          executionMode: 'live_gemini',
         };
       }
     } catch (err) {
@@ -223,5 +224,6 @@ Return JSON only.`;
     ],
     sources: [],
     limitations: ['Validation hypotheses are structured experiment protocols; founder must execute interviews to gather empirical results.'],
+    executionMode: 'deterministic_fallback',
   };
 }

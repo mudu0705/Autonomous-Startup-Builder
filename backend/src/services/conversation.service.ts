@@ -386,11 +386,45 @@ export class ConversationService {
       },
       {
         $set: {
+          proposedSolution: undefined,
+          targetCustomers: undefined,
+          revenueModel: undefined,
+          additionalInformation: undefined,
           intakeProgress: 0,
           status: 'DRAFT',
         },
       }
     );
+
+    const cleanState: IntakeStructuredState = {
+      startupIdea: null,
+      proposedSolution: null,
+      startupName: null,
+      targetCustomers: null,
+      location: { country: 'India', scope: null, locations: [] },
+      budget: { amount: null, minAmount: null, maxAmount: null, currency: 'INR', source: null, confidence: null },
+      revenueModel: null,
+      additionalInformation: null,
+      analysisDepth: null,
+      fieldSources: {},
+    };
+
+    await ConversationModel.create({
+      projectId: new mongoose.Types.ObjectId(projectId),
+      userId: new mongoose.Types.ObjectId(userId),
+      title: 'Startup Intake',
+      messages: [
+        {
+          role: 'assistant',
+          content: `Welcome to the Autonomous Startup Builder intake! ${INTAKE_QUESTIONS.startupIdea}`,
+          timestamp: new Date(),
+        },
+      ],
+      structuredState: cleanState,
+      currentCategory: 'startupIdea',
+      readyForAnalysis: false,
+      completedCategories: [],
+    });
 
     return await this.getConversationData(projectId, userId);
   }

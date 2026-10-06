@@ -83,6 +83,7 @@ Return JSON only. Do not hallucinate external statistics.`;
           improvementOpportunities: response.parsed.improvementOpportunities || ['Bundle workflow onboarding guides', 'Introduce automated template presets'],
           sources: [],
           limitations: ['Preliminary assessment grounded in founder intake data without empirical cohort telemetry'],
+          executionMode: 'live_gemini',
         };
       }
     } catch (err) {
@@ -98,6 +99,7 @@ Return JSON only. Do not hallucinate external statistics.`;
     name: 'Idea & Problem Agent',
     score: 76,
     confidence: 0.85,
+    executionMode: 'deterministic_fallback',
     executiveSummary: `The proposed startup "${startupName}" addresses a real and identifiable problem for ${audience} in ${loc}. The proposed solution offers a viable mechanism to eliminate process friction.`,
     problemStatement: `Inefficient workflows and lack of tailored solutions for ${audience} trying to solve: "${idea}".`,
     rootCauses: [

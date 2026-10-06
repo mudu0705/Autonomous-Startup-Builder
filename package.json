@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "test": "tsx --test backend/tests/auth.test.ts backend/tests/project.test.ts backend/tests/intake.test.ts"
+    "test": "tsx --test backend/tests/auth.test.ts backend/tests/project.test.ts backend/tests/intake.test.ts backend/tests/analysis.test.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.3.0",

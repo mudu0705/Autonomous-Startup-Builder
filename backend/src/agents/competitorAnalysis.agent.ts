@@ -141,6 +141,7 @@ Return JSON only.`;
           recommendations: response.parsed.recommendations || ['Emphasize tailored workflow speed rather than matching every legacy feature', 'Lock in early users with specialized integrations'],
           sources: verifiedSources,
           limitations: response.parsed.limitations || ['Competitor pricing and roadmaps reflect publicly observable data.'],
+          executionMode: 'live_gemini',
         };
       }
     } catch (err) {
@@ -156,6 +157,7 @@ Return JSON only.`;
     name: 'Competitor Analysis Agent',
     score: 74,
     confidence: 0.83,
+    executionMode: 'deterministic_fallback',
     executiveSummary: `The competitive landscape for "${idea}" features established legacy tools and informal workflows. The primary competitive advantage lies in vertical focus, lower onboarding friction, and localized workflows for ${audience}.`,
     directCompetitors: [
       {

@@ -116,6 +116,7 @@ Return JSON only.`;
           isResearchAvailable,
           sources: verifiedSources,
           limitations: response.parsed.limitations || (isResearchAvailable ? [] : ['Live web research provider offline; analytical estimates derived from macroeconomic baseline data.']),
+          executionMode: 'live_gemini',
         };
       }
     } catch (err) {
@@ -131,6 +132,7 @@ Return JSON only.`;
     name: 'Market Research Agent',
     score: 72,
     confidence: 0.82,
+    executionMode: 'deterministic_fallback',
     executiveSummary: `Market evaluation indicates healthy demand fundamentals in ${loc} for ${audience}. Growth is supported by increasing digital adoption, though unit economics require careful monitoring.`,
     marketOverview: `The addressable sector in India is undergoing steady transformation as consumers and businesses migrate from manual workarounds to specialized vertical solutions. For "${idea}", the primary driver is time-to-value and ease of adoption.`,
     marketSizeTAM: '₹12,000 Cr (Analytical Top-Down Model Estimate for India)',

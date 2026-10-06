@@ -3,7 +3,7 @@ export interface ReportSection {
   title: string;
   agentId?: string;
   summary: string;
-  content: string | Record<string, unknown>;
+  content: string | Record<string, unknown> | unknown[];
   keyFindings?: string[];
   recommendations?: string[];
 }

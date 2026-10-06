@@ -72,7 +72,8 @@ export type UserRegistrationRouteInput = z.infer<typeof UserRegistrationRouteSch
 export type UserLoginInput = z.infer<typeof UserLoginSchema>;
 export type ProjectLocationInput = z.infer<typeof ProjectLocationSchema>;
 export type ProjectBudgetInput = z.infer<typeof ProjectBudgetSchema>;
-export type ProjectCreateInput = z.infer<typeof ProjectCreateSchema>;
+export type ProjectCreateInput = z.input<typeof ProjectCreateSchema>;
+export type ProjectCreateOutput = z.output<typeof ProjectCreateSchema>;
 export type ProjectUpdateInput = z.infer<typeof ProjectUpdateSchema>;
 
 export * from './intake.schema.ts';

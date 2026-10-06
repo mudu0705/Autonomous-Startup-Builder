@@ -2,6 +2,7 @@ import mongoose, { Schema, Document } from 'mongoose';
 import type { UserRole, UserStatus } from '../../../shared/types/user.ts';
 
 export interface IUserDocument extends Document {
+  id?: string;
   email: string;
   passwordHash: string;
   role: UserRole;

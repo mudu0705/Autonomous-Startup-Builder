@@ -15,7 +15,7 @@ import { logger } from '../config/logger.ts';
  */
 export function toSafeUser(doc: IUserDocument): User {
   return {
-    id: doc._id ? doc._id.toString() : doc.id,
+    id: doc._id ? doc._id.toString() : String(doc.id || doc._id),
     email: doc.email,
     role: doc.role,
     status: doc.status,

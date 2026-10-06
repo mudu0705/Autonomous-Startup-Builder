@@ -7,7 +7,7 @@ import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../src/app.ts';
 import { AuthService } from '../src/auth/auth.service.ts';
 import { argon2Hasher } from '../src/auth/argon2.hasher.ts';
-import { JwtTokenManager } from '../src/auth/jwt.manager.ts';
+import { JwtTokenManager, jwtTokenManager } from '../src/auth/jwt.manager.ts';
 import { ProjectModel } from '../src/models/Project.ts';
 import { UserModel } from '../src/models/User.ts';
 
@@ -27,7 +27,7 @@ describe('Phase 2.4A Project Persistence, CRUD & Ownership Security Tests', () =
     const uri = mongod.getUri();
     await mongoose.connect(uri);
 
-    tokenManager = new JwtTokenManager('test-jwt-secret-key-12345', '1h');
+    tokenManager = jwtTokenManager;
     authService = new AuthService(argon2Hasher, tokenManager);
 
     app = await buildApp();

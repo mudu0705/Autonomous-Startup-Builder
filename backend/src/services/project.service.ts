@@ -12,7 +12,7 @@ import { logger } from '../config/logger.ts';
  */
 export function toSafeProject(doc: IProjectDocument): Project {
   return {
-    id: doc._id ? doc._id.toString() : doc.id,
+    id: doc._id ? doc._id.toString() : String(doc.id || doc._id),
     userId: doc.userId ? doc.userId.toString() : String(doc.userId),
     name: doc.name,
     startupIdea: doc.startupIdea,

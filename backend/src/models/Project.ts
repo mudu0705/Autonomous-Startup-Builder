@@ -7,6 +7,7 @@ import type {
 } from '../../../shared/types/project.ts';
 
 export interface IProjectDocument extends Document {
+  id?: string;
   userId: mongoose.Types.ObjectId;
   name: string;
   startupIdea: string;

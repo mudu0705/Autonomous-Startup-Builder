@@ -108,6 +108,7 @@ Return JSON only.`;
           recommendations: response.parsed.recommendations || ['Establish weekly cash burn tracking', 'Deploy automated backup mechanisms for user data'],
           sources: [],
           limitations: ['Risk scores reflect modeled venture probability matrix.'],
+          executionMode: 'live_gemini',
         };
       }
     } catch (err) {
@@ -208,5 +209,6 @@ Return JSON only.`;
     ],
     sources: [],
     limitations: ['Risk evaluation based on modeled probability matrix; live monitoring required.'],
+    executionMode: 'deterministic_fallback',
   };
 }

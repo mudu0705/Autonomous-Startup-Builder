@@ -3,21 +3,34 @@ import { env } from '../config/env.ts';
 import { logger } from '../config/logger.ts';
 import type { DatabaseStatus } from '../../../shared/types/health.ts';
 
+// Fail fast on disconnected database operations instead of hanging indefinitely
+mongoose.set('bufferCommands', false);
+
 class DatabaseService {
   private status: DatabaseStatus = 'disconnected';
   private lastErrorMessage: string | null = null;
   private isConnecting = false;
+  private mongoMemoryServer: any = null;
 
   public async connect(): Promise<boolean> {
-    const uri = env.MONGODB_URI?.trim();
+    let uri = env.MONGODB_URI?.trim();
 
     if (!uri) {
-      this.status = 'disconnected';
-      this.lastErrorMessage = 'MONGODB_URI is not configured in environment variables.';
-      logger.warn('Database service: MongoDB URI not provided. Running in disconnected mode.', {
-        instruction: 'To enable persistence, define MONGODB_URI in your environment configuration.',
-      });
-      return false;
+      try {
+        logger.info('Database service: No MONGODB_URI provided. Initializing in-memory MongoDB instance for preview...');
+        const { MongoMemoryServer } = await import('mongodb-memory-server');
+        this.mongoMemoryServer = await MongoMemoryServer.create();
+        uri = this.mongoMemoryServer.getUri();
+        logger.info('Database service: In-memory MongoDB instance started successfully.');
+      } catch (memErr) {
+        this.status = 'disconnected';
+        this.lastErrorMessage = 'MONGODB_URI is not configured in environment variables.';
+        logger.warn('Database service: MongoDB URI not provided and in-memory server could not start. Running in disconnected mode.', {
+          instruction: 'To enable persistence, define MONGODB_URI in your environment configuration.',
+          error: memErr instanceof Error ? memErr.message : String(memErr),
+        });
+        return false;
+      }
     }
 
     if (this.isConnecting) {
@@ -68,6 +81,15 @@ class DatabaseService {
   }
 
   public async disconnect(): Promise<void> {
+    if (this.mongoMemoryServer) {
+      try {
+        await this.mongoMemoryServer.stop();
+      } catch {
+        // ignore
+      }
+      this.mongoMemoryServer = null;
+    }
+
     if (this.status === 'connected') {
       try {
         await mongoose.disconnect();

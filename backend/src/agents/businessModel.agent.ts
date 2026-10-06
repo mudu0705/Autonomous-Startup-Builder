@@ -129,6 +129,7 @@ Return JSON only.`;
           recommendations: response.parsed.recommendations || ['Support seamless UPI Autopay and QR instant payments to maximize checkout conversion', 'Implement annual prepayment discounts (2 months free) to boost upfront cash flow'],
           sources: [],
           limitations: ['Unit economics are modeled venture baselines; conversion rates will vary during live testing.'],
+          executionMode: 'live_gemini',
         };
       }
     } catch (err) {
@@ -237,5 +238,6 @@ Return JSON only.`;
     ],
     sources: [],
     limitations: ['Unit economics are analytical venture models. Actual conversion metrics must be tracked in production.'],
+    executionMode: 'deterministic_fallback',
   };
 }

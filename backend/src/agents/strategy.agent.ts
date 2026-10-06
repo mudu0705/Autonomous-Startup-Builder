@@ -144,6 +144,7 @@ Return JSON only.`;
           recommendations: response.parsed.recommendations || ['Follow the 30-day customer validation plan before spending on paid ads', 'Set up automated retention telemetry from day one'],
           sources: [],
           limitations: ['Strategy recommendations provide analytical guidance; no commercial outcome is guaranteed.'],
+          executionMode: 'live_gemini',
         };
       }
     } catch (err) {
@@ -224,5 +225,6 @@ Return JSON only.`;
     ],
     sources: [],
     limitations: ['Strategy assessment synthesizes available intake and prior agent metrics. No financial return is guaranteed.'],
+    executionMode: 'deterministic_fallback',
   };
 }

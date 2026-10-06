@@ -10,6 +10,18 @@ export type DecisionVerdict =
   | 'Validate first'
   | 'High concerns';
 
+export interface ScoreCategory {
+  category: string;
+  weight: number;
+  score: number;
+  maxScore: number;
+  factors: Array<{
+    factor: string;
+    points: number;
+    explanation: string;
+  }>;
+}
+
 export interface DimensionScore {
   dimension: string;
   agentId: string;

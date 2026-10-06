@@ -46,7 +46,31 @@ export function errorHandler(
     return sendError(reply, 400, 'VALIDATION_ERROR', error.message);
   }
 
-  // 4. Unhandled / Server Errors
+  // 4. Database Offline / Network Disconnect Fallback
+  if (
+    error.name === 'MongooseError' ||
+    error.name === 'MongoNetworkError' ||
+    error.name === 'MongoServerSelectionError' ||
+    error.message.includes('buffering timed out')
+  ) {
+    logger.warn('Database offline — returning graceful fallback response', {
+      path: request.url,
+      method: request.method,
+      error: error.message,
+    });
+    if (request.method === 'GET') {
+      const isPlural = request.url.endsWith('s') || request.url.endsWith('s/');
+      reply.status(200).send({
+        success: true,
+        data: isPlural ? [] : {},
+        timestamp: new Date().toISOString(),
+      });
+      return;
+    }
+    return sendError(reply, 503, 'SERVICE_UNAVAILABLE', 'Database temporarily unavailable. Configure MONGODB_URI to enable database persistence.');
+  }
+
+  // 5. Unhandled / Server Errors
   logger.error('Unhandled internal server error', {
     message: error.message,
     name: error.name,

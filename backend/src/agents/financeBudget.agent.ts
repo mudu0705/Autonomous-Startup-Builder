@@ -194,5 +194,6 @@ Return JSON only.`;
         ],
     sources: [],
     limitations: ['Projections are modeled scenario estimates. Founder must track actual monthly cash burn in real time.'],
+    executionMode: qualitativeRisks.length > 0 ? 'live_gemini' : 'deterministic_fallback',
   };
 }

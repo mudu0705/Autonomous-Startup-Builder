@@ -79,7 +79,7 @@ export function normalizeIndianBudget(text: string): IntakeBudget | null {
 
   // 2. Check for ranges like "3-5 lakh" or "₹3 to ₹5 lakhs"
   const rangeMatch = lower.match(
-    /(?:₹|rs\.?|inr)?\s*(\d+(?:\.\d+)?)\s*(?:-|to)\s*(?:₹|rs\.?|inr)?\s*(\d+(?:\.\d+)?)\s*(lakh|lakhs|lac|lacs|crore|crores|cr|k|thousand)?/i
+    /(?:₹|rs\.?|inr)?\s*(\d+(?:\.\d+)?)\s*(?:[-–—]|to)\s*(?:₹|rs\.?|inr)?\s*(\d+(?:\.\d+)?)\s*(lakh|lakhs|lac|lacs|crore|crores|cr|k|thousand)?/i
   );
 
   if (rangeMatch) {
