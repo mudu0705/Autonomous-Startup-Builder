@@ -29,7 +29,15 @@ class DatabaseService {
     });
   }
 
+  private mongoMemoryDisabled = false;
+
   private async connectToMemoryServer(fallbackReason?: string): Promise<boolean> {
+    if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || this.mongoMemoryDisabled) {
+      this.status = 'disconnected';
+      this.lastErrorMessage = 'Running in serverless mode with in-memory persistence fallback.';
+      return false;
+    }
+
     try {
       logger.info(
         fallbackReason
@@ -61,6 +69,7 @@ class DatabaseService {
       return true;
     } catch (memErr: unknown) {
       this.status = 'disconnected';
+      this.mongoMemoryDisabled = true;
       const errorMsg = memErr instanceof Error ? memErr.message : String(memErr);
       this.lastErrorMessage = errorMsg;
       logger.warn('Database service: In-memory MongoDB server could not start. Running in disconnected mode.', {
